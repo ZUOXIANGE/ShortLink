@@ -1,5 +1,12 @@
 # ShortLink · 自建短链平台
 
+[![CI](https://github.com/ZUOXIANGE/ShortLink/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/ZUOXIANGE/ShortLink/actions/workflows/ci.yml)
+[![License: MIT](https://img.shields.io/github/license/ZUOXIANGE/ShortLink)](https://github.com/ZUOXIANGE/ShortLink/blob/main/LICENSE.txt)
+[![.NET](https://img.shields.io/badge/.NET-10-512BD4?logo=dotnet&logoColor=white)](https://dotnet.microsoft.com/)
+[![Blazor WebAssembly](https://img.shields.io/badge/Blazor-WASM-512BD4?logo=blazor&logoColor=white)](https://dotnet.microsoft.com/apps/aspnet/web-apps/blazor)
+[![EF Core](https://img.shields.io/badge/EF%20Core-10-512BD4?logo=dotnet&logoColor=white)](https://learn.microsoft.com/ef/core/)
+[![Last commit](https://img.shields.io/github/last-commit/ZUOXIANGE/ShortLink)](https://github.com/ZUOXIANGE/ShortLink/commits/main)
+
 一套可自托管的短链接平台，覆盖「建链 → 跳转 → 统计 → 归因」完整链路。前后端完全分离：后端只提供统一信封的 HTTP API，前端是独立部署的 Blazor WebAssembly 单页应用，通过 Bearer Token 调用，不共享服务端会话。
 
 | 维度 | 选型 |
