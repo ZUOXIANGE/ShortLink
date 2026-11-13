@@ -1,0 +1,12 @@
+{
+  "$schema": "https://alirezanet.github.io/Husky.Net/schema.json",
+  "tasks": [
+    {
+      "group": "pre-commit",
+      "name": "dotnet-format",
+      "command": "dotnet",
+      "args": ["format", "ShortLink.slnx", "--include", "${staged}"],
+      "include": ["**/*.cs"]
+    }
+  ]
+}

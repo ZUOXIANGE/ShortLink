@@ -1,0 +1,9 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <RootNamespace>ShortLink.Contracts</RootNamespace>
+    <AssemblyName>ShortLink.Contracts</AssemblyName>
+    <Description>对外契约：统一响应信封、业务码表、业务异常与 DTO。后端与 Blazor WASM 前端共享，不得依赖任何服务端实现。</Description>
+  </PropertyGroup>
+
+</Project>

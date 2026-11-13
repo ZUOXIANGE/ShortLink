@@ -1,0 +1,161 @@
+@inject ApiClient Api
+@inject ISnackbar Snackbar
+@inject Permissions Perms
+
+<MudDialog>
+    <TitleContent>
+        <MudText Typo="Typo.h6">@(IsEdit ? "编辑账号" : "新建账号")</MudText>
+    </TitleContent>
+    <DialogContent>
+        <MudStack Spacing="3" Class="mt-2">
+            <MudTextField @bind-Value="_userName" Label="登录名" Variant="Variant.Outlined"
+                          Margin="Margin.Dense" Disabled="@IsEdit" Immediate="true" />
+
+            <MudTextField @bind-Value="_displayName" Label="显示名" Variant="Variant.Outlined"
+                          Margin="Margin.Dense" Immediate="true" />
+
+            @if (!IsEdit)
+            {
+                <MudTextField @bind-Value="_password" Label="初始密码" Variant="Variant.Outlined"
+                              Margin="Margin.Dense" InputType="InputType.Password"
+                              HelperText="至少 8 位，创建后可通过重置密码修改" />
+            }
+
+            <MudSelect T="string" @bind-Value="_role" Label="角色" Variant="Variant.Outlined" Margin="Margin.Dense">
+                @foreach (var role in AssignableRoles)
+                {
+                    <MudSelectItem T="string" Value="@role">@Permissions.RoleDisplayName(role)</MudSelectItem>
+                }
+            </MudSelect>
+
+            <MudText Typo="Typo.caption" Class="hint">
+                @(IsEdit
+                    ? "不能把账号提升到高于自己的角色，也不能移除最后一个所有者。"
+                    : "新账号会加入当前工作区，角色决定其可见范围与可执行操作。")
+            </MudText>
+
+            @if (IsEdit)
+            {
+                <MudSwitch T="bool" Value="@_isEnabled" ValueChanged="@((bool v) => _isEnabled = v)"
+                           Color="Color.Primary" Label="启用该账号" />
+            }
+
+            @if (!string.IsNullOrEmpty(_error))
+            {
+                <MudAlert Severity="Severity.Error" Dense="true">@_error</MudAlert>
+            }
+        </MudStack>
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="Cancel">取消</MudButton>
+        <MudButton Color="Color.Primary" Variant="Variant.Filled" OnClick="SubmitAsync" Disabled="_busy">
+            @(IsEdit ? "保存" : "创建")
+        </MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [CascadingParameter]
+    private IMudDialogInstance MudDialog { get; set; } = default!;
+
+    [Parameter]
+    public ManagedUserDto? User { get; set; }
+
+    private string _userName = string.Empty;
+    private string _displayName = string.Empty;
+    private string _password = string.Empty;
+    private string _role = "member";
+    private bool _isEnabled = true;
+    private string? _error;
+    private bool _busy;
+
+    private bool IsEdit => User is not null;
+
+    /// <summary>只能分配不高于自己的角色，避免成员把自己提成管理员。</summary>
+    private IEnumerable<string> AssignableRoles => new[] { "viewer", "member", "admin", "owner" }
+        .Where(role => Permissions.Rank(role) <= Permissions.Rank(Perms.Role));
+
+    protected override void OnInitialized()
+    {
+        if (User is null)
+        {
+            _role = AssignableRoles.Contains("member") ? "member" : AssignableRoles.First();
+            return;
+        }
+
+        _userName = User.UserName;
+        _displayName = User.DisplayName;
+        _role = User.Role;
+        _isEnabled = User.IsEnabled;
+    }
+
+    private void Cancel() => MudDialog.Cancel();
+
+    private async Task SubmitAsync()
+    {
+        _error = null;
+
+        if (string.IsNullOrWhiteSpace(_userName))
+        {
+            _error = "请填写登录名";
+            return;
+        }
+
+        if (!IsEdit && _password.Length < 8)
+        {
+            _error = "初始密码至少 8 位";
+            return;
+        }
+
+        _busy = true;
+        try
+        {
+            ApiResponse<ManagedUserDto> response;
+
+            if (User is null)
+            {
+                response = await Api.CreateUserAsync(new CreateUserRequest
+                {
+                    UserName = _userName.Trim(),
+                    DisplayName = string.IsNullOrWhiteSpace(_displayName) ? _userName.Trim() : _displayName.Trim(),
+                    Password = _password,
+                    Role = _role,
+                });
+            }
+            else
+            {
+                response = await Api.UpdateUserAsync(User.Id, new UpdateUserRequest
+                {
+                    DisplayName = _displayName.Trim(),
+                    Role = _role,
+                    IsEnabled = _isEnabled,
+                });
+            }
+
+            if (response.Code == BizCodes.Success)
+            {
+                Snackbar.Add(IsEdit ? "账号已更新" : "账号已创建", Severity.Success);
+                MudDialog.Close(DialogResult.Ok(true));
+                return;
+            }
+
+            _error = FirstError(response) ?? ErrorMessages.From(response.Code, response.Msg);
+        }
+        finally
+        {
+            _busy = false;
+        }
+    }
+
+    private static string? FirstError<T>(ApiResponse<T> response)
+        => response.Errors is { Count: > 0 }
+            ? response.Errors.SelectMany(pair => pair.Value).FirstOrDefault()
+            : null;
+}
+
+<style>
+    .hint {
+        font-size: 12px;
+        color: #9b8085;
+    }
+</style>

@@ -1,0 +1,193 @@
+@page "/security"
+@attribute [Authorize]
+@inject ApiClient Api
+@inject Permissions Perms
+
+<div class="d-flex align-center justify-space-between mb-4 flex-wrap gap-2">
+    <div>
+        <h1 class="page-title">安全事件</h1>
+        <p class="page-subtitle">IP 拦截、机器人拦截、地址被拒、滥用举报与点击封顶都会落到这里</p>
+    </div>
+</div>
+
+<MudPaper Elevation="0" Class="pa-3 mb-3" Style="border:1px solid #F0E4E6;border-radius:14px;">
+    <MudStack Row="true" Spacing="3" AlignItems="AlignItems.Center" Class="flex-wrap">
+        <MudSelect T="string" Value="_type" Label="事件类型" Variant="Variant.Outlined" Margin="Margin.Dense"
+                   Style="width:200px;" ValueChanged="OnTypeChanged">
+            <MudSelectItem T="string" Value="@((string?)null)">全部类型</MudSelectItem>
+            <MudSelectItem T="string" Value="@SecurityEventTypes.IpBlocked">IP 黑名单拦截</MudSelectItem>
+            <MudSelectItem T="string" Value="@SecurityEventTypes.IpNotAllowed">IP 不在白名单</MudSelectItem>
+            <MudSelectItem T="string" Value="@SecurityEventTypes.BotBlocked">机器人拦截</MudSelectItem>
+            <MudSelectItem T="string" Value="@SecurityEventTypes.UrlRejected">目标地址被拒</MudSelectItem>
+            <MudSelectItem T="string" Value="@SecurityEventTypes.AbuseReported">滥用举报</MudSelectItem>
+            <MudSelectItem T="string" Value="@SecurityEventTypes.ClickCapReached">点击封顶停用</MudSelectItem>
+        </MudSelect>
+
+        <MudTextField @bind-Value="_code" Label="短码" Variant="Variant.Outlined" Margin="Margin.Dense"
+                      Immediate="true" OnKeyUp="OnCodeKeyUp" Style="width:180px;" />
+
+        <MudSelect T="int?" Value="_days" Label="时间范围" Variant="Variant.Outlined" Margin="Margin.Dense"
+                   Style="width:150px;" ValueChanged="OnDaysChanged">
+            <MudSelectItem T="int?" Value="@((int?)null)">全部</MudSelectItem>
+            <MudSelectItem T="int?" Value="@((int?)1)">近 1 天</MudSelectItem>
+            <MudSelectItem T="int?" Value="@((int?)7)">近 7 天</MudSelectItem>
+            <MudSelectItem T="int?" Value="@((int?)30)">近 30 天</MudSelectItem>
+        </MudSelect>
+
+        <MudButton Variant="Variant.Outlined" Color="Color.Primary" StartIcon="@Icons.Material.Filled.Refresh"
+                   OnClick="ReloadAsync">
+            刷新
+        </MudButton>
+    </MudStack>
+</MudPaper>
+
+@if (!Perms.CanManage)
+{
+    <MudAlert Severity="Severity.Info" Dense="true" Class="mb-4">
+        安全事件仅管理员可见，当前角色（@Perms.RoleName）无权查看。
+    </MudAlert>
+}
+else
+{
+    <MudTable @ref="_table" T="SecurityEventDto" ServerData="LoadServerData" Dense="true" Hover="true"
+              Elevation="0" Style="border:1px solid #F0E4E6;border-radius:14px;overflow:hidden;">
+        <HeaderContent>
+            <MudTh>时间</MudTh>
+            <MudTh>类型</MudTh>
+            <MudTh>说明</MudTh>
+            <MudTh>短码</MudTh>
+            <MudTh>来源 IP</MudTh>
+            <MudTh>国家</MudTh>
+        </HeaderContent>
+        <RowTemplate>
+            <MudTd DataLabel="时间">@context.CreatedAtUtc.ToLocalTime().ToString("yyyy-MM-dd HH:mm:ss")</MudTd>
+            <MudTd DataLabel="类型">
+                <MudChip T="string" Size="Size.Small" Color="@TypeColor(context.Type)">@context.TypeName</MudChip>
+            </MudTd>
+            <MudTd DataLabel="说明">
+                <span class="truncate" title="@context.Message">@context.Message</span>
+            </MudTd>
+            <MudTd DataLabel="短码" Class="mono">@(context.Code ?? "-")</MudTd>
+            <MudTd DataLabel="来源 IP" Class="mono">@(context.Ip ?? "-")</MudTd>
+            <MudTd DataLabel="国家">@(context.Country ?? "-")</MudTd>
+        </RowTemplate>
+        <PagerContent>
+            <MudTablePager PageSizeOptions="new[] { 20, 50, 100 }" RowsPerPageString="每页行数"
+                           InfoFormat="{first_item}-{last_item} / {all_items}" />
+        </PagerContent>
+    </MudTable>
+}
+
+@code {
+    private MudTable<SecurityEventDto>? _table;
+    private string? _type;
+    private string? _code;
+    private int? _days;
+    private CancellationTokenSource? _loadCancellation;
+    private long _loadVersion;
+    private IReadOnlyList<SecurityEventDto> _pageItems = [];
+    private int _totalItems;
+
+    private static Color TypeColor(string type) => type switch
+    {
+        SecurityEventTypes.AbuseReported => Color.Error,
+        SecurityEventTypes.UrlRejected => Color.Error,
+        SecurityEventTypes.ClickCapReached => Color.Warning,
+        SecurityEventTypes.BotBlocked => Color.Info,
+        _ => Color.Default,
+    };
+
+    private async Task<TableData<SecurityEventDto>> LoadServerData(TableState state, CancellationToken cancellationToken)
+    {
+        _loadCancellation?.Cancel();
+        _loadCancellation?.Dispose();
+        var loadCancellation = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+        _loadCancellation = loadCancellation;
+        var version = ++_loadVersion;
+
+        try
+        {
+            var response = await Api.QuerySecurityEventsAsync(new SecurityEventQuery
+            {
+                Page = state.Page + 1,
+                PageSize = state.PageSize,
+                Type = _type,
+                Code = _code,
+                Days = _days,
+            }, loadCancellation.Token);
+
+            if (version != _loadVersion || loadCancellation.IsCancellationRequested)
+            {
+                return CurrentTableData();
+            }
+
+            if (response.Code != BizCodes.Success || response.Data is null)
+            {
+                Api.NotifyIfFailed(response);
+                _pageItems = [];
+                _totalItems = 0;
+                return new TableData<SecurityEventDto> { Items = [], TotalItems = 0 };
+            }
+
+            _pageItems = response.Data.Items;
+            _totalItems = (int)response.Data.Total;
+            return CurrentTableData();
+        }
+        catch (OperationCanceledException) when (loadCancellation.IsCancellationRequested)
+        {
+            return CurrentTableData();
+        }
+        finally
+        {
+            if (ReferenceEquals(_loadCancellation, loadCancellation))
+            {
+                _loadCancellation = null;
+            }
+
+            loadCancellation.Dispose();
+        }
+    }
+
+    private TableData<SecurityEventDto> CurrentTableData() => new()
+    {
+        Items = _pageItems,
+        TotalItems = _totalItems,
+    };
+
+    private async Task OnCodeKeyUp(KeyboardEventArgs args)
+    {
+        if (args.Key == "Enter")
+        {
+            await ReloadFirstPageAsync();
+        }
+    }
+
+    private async Task OnTypeChanged(string? type)
+    {
+        _type = type;
+        await ReloadFirstPageAsync();
+    }
+
+    private async Task OnDaysChanged(int? days)
+    {
+        _days = days;
+        await ReloadFirstPageAsync();
+    }
+
+    private async Task ReloadAsync()
+    {
+        if (_table is not null)
+        {
+            await _table.ReloadServerData();
+        }
+    }
+
+    private async Task ReloadFirstPageAsync()
+    {
+        if (_table is not null)
+        {
+            _table.NavigateTo(0);
+            await _table.ReloadServerData();
+        }
+    }
+}

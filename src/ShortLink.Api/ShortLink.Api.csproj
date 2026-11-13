@@ -1,0 +1,51 @@
+<Project Sdk="Microsoft.NET.Sdk.Web">
+
+  <PropertyGroup>
+    <RootNamespace>ShortLink.Api</RootNamespace>
+    <AssemblyName>ShortLink.Api</AssemblyName>
+    <UserSecretsId>shortlink-api-secrets</UserSecretsId>
+    <Description>API 宿主：Minimal API 端点、统一信封与异常收口、JWT 认证、跳转端点、可观测性。</Description>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\ShortLink.Application\ShortLink.Application.csproj" />
+    <ProjectReference Include="..\ShortLink.Infrastructure\ShortLink.Infrastructure.csproj" />
+    <ProjectReference Include="..\ShortLink.Mcp\ShortLink.Mcp.csproj" />
+    <!--
+      多 provider 迁移必须随宿主一起发布：EF Core 通过 MigrationsAssembly 名称反射加载，
+      运行时缺少该程序集会直接抛 FileNotFoundException。
+    -->
+    <ProjectReference Include="..\ShortLink.Infrastructure.Migrations.Sqlite\ShortLink.Infrastructure.Migrations.Sqlite.csproj" />
+    <ProjectReference Include="..\ShortLink.Infrastructure.Migrations.MySql\ShortLink.Infrastructure.Migrations.MySql.csproj" />
+    <ProjectReference Include="..\ShortLink.Infrastructure.Migrations.PostgreSql\ShortLink.Infrastructure.Migrations.PostgreSql.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.AspNetCore.OpenApi" />
+    <PackageReference Include="Microsoft.AspNetCore.Authentication.JwtBearer" />
+    <PackageReference Include="Asp.Versioning.Http" />
+    <PackageReference Include="Asp.Versioning.OpenApi" />
+    <PackageReference Include="Scalar.AspNetCore" />
+    <PackageReference Include="Serilog.AspNetCore" />
+    <PackageReference Include="Serilog.Sinks.Console" />
+    <PackageReference Include="Serilog.Sinks.File" />
+    <PackageReference Include="OpenTelemetry.Extensions.Hosting" />
+    <PackageReference Include="OpenTelemetry.Instrumentation.AspNetCore" />
+    <PackageReference Include="OpenTelemetry.Instrumentation.Http" />
+    <PackageReference Include="OpenTelemetry.Instrumentation.Runtime" />
+    <PackageReference Include="OpenTelemetry.Exporter.OpenTelemetryProtocol" />
+    <PackageReference Include="FluentValidation.DependencyInjectionExtensions" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.EntityFrameworkCore.Design">
+      <PrivateAssets>all</PrivateAssets>
+      <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+    </PackageReference>
+  </ItemGroup>
+
+  <ItemGroup>
+    <InternalsVisibleTo Include="ShortLink.IntegrationTests" />
+  </ItemGroup>
+
+</Project>

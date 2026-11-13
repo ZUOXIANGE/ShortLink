@@ -1,0 +1,178 @@
+@inject ApiClient Api
+@inject ISnackbar Snackbar
+
+<MudDialog>
+    <TitleContent>
+        <MudText Typo="Typo.h6">@Title</MudText>
+    </TitleContent>
+    <DialogContent>
+        <MudStack Spacing="3" Class="mt-2">
+            @if (Action == BatchActions.ChangeDomain)
+            {
+                <MudSelect T="long?" @bind-Value="_domainId" Label="目标域名" Variant="Variant.Outlined" Margin="Margin.Dense">
+                    @foreach (var domain in Domains)
+                    {
+                        <MudSelectItem T="long?" Value="@((long?)domain.Id)">
+                            @($"{domain.Host}（{domain.Scheme}）")
+                        </MudSelectItem>
+                    }
+                </MudSelect>
+                <MudText Typo="Typo.caption" Class="hint">
+                    若目标域名已存在同短码，该条会被跳过，其余条目照常执行。
+                </MudText>
+            }
+            else if (Action == BatchActions.ChangeExpiry)
+            {
+                <MudGrid Spacing="2">
+                    <MudItem xs="12" sm="6">
+                        <MudDatePicker @bind-Date="_startsAtDate" Label="生效日期（可空）" Variant="Variant.Outlined"
+                                       Margin="Margin.Dense" DateFormat="yyyy-MM-dd" Clearable="true" />
+                    </MudItem>
+                    <MudItem xs="12" sm="6">
+                        <MudDatePicker @bind-Date="_expiresAtDate" Label="过期日期（可空 = 清除）" Variant="Variant.Outlined"
+                                       Margin="Margin.Dense" DateFormat="yyyy-MM-dd" Clearable="true" />
+                    </MudItem>
+                </MudGrid>
+                <MudText Typo="Typo.caption" Class="hint">
+                    过期日期留空表示取消过期限制；生效日期留空表示保持原值。
+                </MudText>
+            }
+            else
+            {
+                <MudAlert Severity="@AlertSeverity" Dense="true">@ConfirmText</MudAlert>
+            }
+
+            <MudText Typo="Typo.body2">已选择 <strong>@Ids.Count</strong> 条短链。</MudText>
+
+            @if (!string.IsNullOrEmpty(_error))
+            {
+                <MudAlert Severity="Severity.Error" Dense="true">@_error</MudAlert>
+            }
+        </MudStack>
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="Cancel">取消</MudButton>
+        <MudButton Color="@(Action == BatchActions.Delete ? Color.Error : Color.Primary)"
+                   Variant="Variant.Filled" OnClick="SubmitAsync" Disabled="_busy">
+            确认执行
+        </MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [CascadingParameter]
+    private IMudDialogInstance MudDialog { get; set; } = default!;
+
+    [Parameter]
+    public string Action { get; set; } = BatchActions.Enable;
+
+    [Parameter]
+    public IReadOnlyList<long> Ids { get; set; } = [];
+
+    [Parameter]
+    public IReadOnlyList<DomainDto> Domains { get; set; } = [];
+
+    private long? _domainId;
+    private DateTime? _expiresAtDate;
+    private DateTime? _startsAtDate;
+    private string? _error;
+    private bool _busy;
+
+    private string Title => Action switch
+    {
+        BatchActions.Enable => "批量启用",
+        BatchActions.Disable => "批量停用",
+        BatchActions.Delete => "批量删除",
+        BatchActions.ChangeDomain => "批量更换域名",
+        BatchActions.ChangeExpiry => "批量调整时间窗",
+        _ => "批量操作",
+    };
+
+    private Severity AlertSeverity => Action == BatchActions.Delete ? Severity.Error : Severity.Info;
+
+    private string ConfirmText => Action == BatchActions.Delete
+        ? "删除后短链立即失效，且访问记录不再展示。此操作不可撤销。"
+        : "将对所选短链执行该操作，其中没有修改权限的条目会被跳过。";
+
+    protected override void OnInitialized()
+        => _domainId = Domains.FirstOrDefault(d => d.IsDefault && d.IsEnabled)?.Id
+                       ?? Domains.FirstOrDefault(d => d.IsEnabled)?.Id;
+
+    private void Cancel() => MudDialog.Cancel();
+
+    private async Task SubmitAsync()
+    {
+        _error = null;
+
+        if (Action == BatchActions.ChangeDomain && _domainId is null)
+        {
+            _error = "请选择目标域名";
+            return;
+        }
+
+        _busy = true;
+        try
+        {
+            if (Ids.Count > BatchLinkRequest.MaxItems)
+            {
+                _error = $"单次最多 {BatchLinkRequest.MaxItems} 条，请分批操作";
+                return;
+            }
+
+            var response = await Api.BatchAsync(new BatchLinkRequest
+            {
+                Action = Action,
+                Ids = Ids.ToList(),
+                DomainId = _domainId,
+                ExpiresAtUtc = Combine(_expiresAtDate, endOfDay: true),
+                StartsAtUtc = Combine(_startsAtDate, endOfDay: false),
+            });
+
+            if (response.Code != BizCodes.Success || response.Data is null)
+            {
+                _error = ErrorMessages.From(response.Code, response.Msg);
+                return;
+            }
+
+            var result = response.Data;
+            if (result.Failed == 0)
+            {
+                Snackbar.Add($"已成功处理 {result.Succeeded} 条", Severity.Success);
+            }
+            else
+            {
+                // 逐条结果对用户有用：让他知道哪几条被跳过，而不是只看到一句「部分失败」。
+                var detail = string.Join("；", result.Items
+                    .Where(i => !i.Success)
+                    .Take(5)
+                    .Select(i => $"{i.ShortCode ?? i.Id.ToString()}：{i.Message}"));
+
+                Snackbar.Add($"成功 {result.Succeeded} 条，失败 {result.Failed} 条。{detail}", Severity.Warning);
+            }
+
+            MudDialog.Close(DialogResult.Ok(result));
+        }
+        finally
+        {
+            _busy = false;
+        }
+    }
+
+    private static DateTime? Combine(DateTime? date, bool endOfDay)
+    {
+        if (date is not { } value)
+        {
+            return null;
+        }
+
+        var clock = endOfDay ? new TimeSpan(23, 59, 59) : TimeSpan.Zero;
+        return DateTime.SpecifyKind(value.Date.Add(clock), DateTimeKind.Local).ToUniversalTime();
+    }
+}
+
+<style>
+    .hint {
+        font-size: 12px;
+        color: #9b8085;
+    }
+</style>

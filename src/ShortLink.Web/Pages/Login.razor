@@ -1,0 +1,133 @@
+@page "/login"
+@layout BlankLayout
+@inject ApiClient Api
+@inject JwtAuthenticationStateProvider AuthState
+@inject NavigationManager Navigation
+
+<MudPaper Class="login-card pa-8" Elevation="4">
+    <div class="login-head">
+        <div class="login-logo">ShortLink</div>
+        <MudText Typo="Typo.body2" Class="login-sub">短链接管理平台 · 登录后台</MudText>
+    </div>
+
+    <MudStack Spacing="4" Class="mt-6">
+        <MudTextField @bind-Value="_userName"
+                      Label="用户名"
+                      Variant="Variant.Outlined"
+                      Margin="Margin.Dense"
+                      AutoFocus="true"
+                      Immediate="true" />
+
+        <MudTextField @bind-Value="_password"
+                      Label="密码"
+                      InputType="InputType.Password"
+                      Variant="Variant.Outlined"
+                      Margin="Margin.Dense"
+                      Immediate="true"
+                      OnKeyUp="OnPasswordKeyUp" />
+
+        @if (!string.IsNullOrEmpty(_error))
+        {
+            <MudAlert Severity="Severity.Error" Dense="true">@_error</MudAlert>
+        }
+
+        <MudButton Variant="Variant.Filled"
+                   Color="Color.Primary"
+                   Size="Size.Large"
+                   FullWidth="true"
+                   OnClick="LoginAsync"
+                   Disabled="_busy">
+            @(_busy ? "登录中…" : "登录")
+        </MudButton>
+    </MudStack>
+
+    <MudText Typo="Typo.caption" Class="login-tip">
+        首次部署的默认账号为 admin，密码由服务端 <code>Seed:AdminPassword</code> 决定，登录后请立即修改。
+    </MudText>
+</MudPaper>
+
+@code {
+    [SupplyParameterFromQuery]
+    public string? ReturnUrl { get; set; }
+
+    private string _userName = "admin";
+    private string _password = string.Empty;
+    private string? _error;
+    private bool _busy;
+
+    private async Task OnPasswordKeyUp(KeyboardEventArgs args)
+    {
+        if (args.Key == "Enter")
+        {
+            await LoginAsync();
+        }
+    }
+
+    private async Task LoginAsync()
+    {
+        if (_busy)
+        {
+            return;
+        }
+
+        _error = null;
+
+        if (string.IsNullOrWhiteSpace(_userName) || string.IsNullOrEmpty(_password))
+        {
+            _error = "请输入用户名与密码";
+            return;
+        }
+
+        _busy = true;
+        try
+        {
+            var response = await Api.LoginAsync(_userName.Trim(), _password);
+            if (response.Code != BizCodes.Success || response.Data is null)
+            {
+                _error = ErrorMessages.From(response.Code, response.Msg);
+                return;
+            }
+
+            await AuthState.SignInAsync(response.Data.AccessToken, response.Data.User);
+
+            Navigation.NavigateTo(ReturnUrlGuard.GetSafePath(ReturnUrl));
+        }
+        finally
+        {
+            _busy = false;
+        }
+    }
+}
+
+<style>
+    .login-card {
+        width: 100%;
+        max-width: 420px;
+        border-radius: 20px;
+        border-top: 4px solid #d70b2a;
+    }
+
+    .login-head {
+        text-align: center;
+    }
+
+    .login-logo {
+        font-size: 26px;
+        font-weight: 700;
+        letter-spacing: .18em;
+        text-transform: uppercase;
+        color: #d70b2a;
+    }
+
+    .login-sub {
+        margin-top: 6px;
+        color: #8a6a6f;
+    }
+
+    .login-tip {
+        display: block;
+        margin-top: 20px;
+        color: #9b8085;
+        line-height: 1.6;
+    }
+</style>

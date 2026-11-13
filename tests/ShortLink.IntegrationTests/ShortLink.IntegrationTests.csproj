@@ -1,0 +1,24 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <RootNamespace>ShortLink.IntegrationTests</RootNamespace>
+    <AssemblyName>ShortLink.IntegrationTests</AssemblyName>
+    <NoWarn>$(NoWarn);CA1707</NoWarn>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\ShortLink.Api\ShortLink.Api.csproj" />
+    <ProjectReference Include="..\..\src\ShortLink.Infrastructure\ShortLink.Infrastructure.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="xunit.v3" />
+    <PackageReference Include="Microsoft.AspNetCore.Mvc.Testing" />
+    <!-- 容器化集成测试（MySQL 方言 / Redis 原子限流）：默认跳过，见 AGENTS.md -->
+    <PackageReference Include="Testcontainers.MySql" />
+    <PackageReference Include="Testcontainers.PostgreSql" />
+    <PackageReference Include="Testcontainers.Redis" />
+  </ItemGroup>
+
+</Project>

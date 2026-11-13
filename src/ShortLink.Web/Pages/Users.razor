@@ -1,0 +1,267 @@
+@page "/users"
+@attribute [Authorize]
+@inject ApiClient Api
+@inject IDialogService DialogService
+@inject ISnackbar Snackbar
+@inject Permissions Perms
+
+<div class="d-flex align-center justify-space-between mb-4 flex-wrap gap-2">
+    <div>
+        <h1 class="page-title">账号与角色</h1>
+        <p class="page-subtitle">按角色分工：所有者 / 管理员可管理全部资源，成员只影响自己创建的短链，只读账号仅可查看</p>
+    </div>
+    <MudButton Variant="Variant.Filled" Color="Color.Primary" StartIcon="@Icons.Material.Filled.PersonAdd"
+               OnClick="CreateAsync" Disabled="@(!Perms.CanManage)">
+        新建账号
+    </MudButton>
+</div>
+
+@if (!Perms.CanManage)
+{
+    <MudAlert Severity="Severity.Info" Dense="true" Class="mb-4">
+        当前角色（@Perms.RoleName）只能查看账号列表，无法新增或修改。
+    </MudAlert>
+}
+
+<MudPaper Elevation="0" Class="pa-3 mb-3" Style="border:1px solid #F0E4E6;border-radius:14px;">
+    <MudStack Row="true" Spacing="3" AlignItems="AlignItems.Center" Class="flex-wrap">
+        <MudTextField @bind-Value="_keyword" Label="搜索登录名 / 显示名" Variant="Variant.Outlined"
+                      Margin="Margin.Dense" Adornment="Adornment.Start"
+                      AdornmentIcon="@Icons.Material.Filled.Search" Immediate="true"
+                      OnKeyUp="OnKeywordKeyUp" Style="min-width:280px;" />
+
+        <MudSelect T="string" Value="_role" Label="角色" Variant="Variant.Outlined" Margin="Margin.Dense"
+                   Style="width:160px;" ValueChanged="OnRoleChanged">
+            <MudSelectItem T="string" Value="@((string?)null)">全部角色</MudSelectItem>
+            <MudSelectItem T="string" Value="@("owner")">所有者</MudSelectItem>
+            <MudSelectItem T="string" Value="@("admin")">管理员</MudSelectItem>
+            <MudSelectItem T="string" Value="@("member")">成员</MudSelectItem>
+            <MudSelectItem T="string" Value="@("viewer")">只读</MudSelectItem>
+        </MudSelect>
+
+        <MudSelect T="bool?" Value="_enabled" Label="状态" Variant="Variant.Outlined" Margin="Margin.Dense"
+                   Style="width:140px;" ValueChanged="OnEnabledChanged">
+            <MudSelectItem T="bool?" Value="@((bool?)null)">全部</MudSelectItem>
+            <MudSelectItem T="bool?" Value="@((bool?)true)">启用</MudSelectItem>
+            <MudSelectItem T="bool?" Value="@((bool?)false)">停用</MudSelectItem>
+        </MudSelect>
+
+        <MudButton Variant="Variant.Outlined" Color="Color.Primary" StartIcon="@Icons.Material.Filled.Refresh"
+                   OnClick="ReloadAsync">
+            刷新
+        </MudButton>
+    </MudStack>
+</MudPaper>
+
+<MudTable @ref="_table" T="ManagedUserDto" ServerData="LoadServerData" Dense="true" Hover="true"
+          Elevation="0" Style="border:1px solid #F0E4E6;border-radius:14px;overflow:hidden;">
+    <HeaderContent>
+        <MudTh>账号</MudTh>
+        <MudTh>角色</MudTh>
+        <MudTh>状态</MudTh>
+        <MudTh>最近登录</MudTh>
+        <MudTh>创建时间</MudTh>
+        <MudTh>操作</MudTh>
+    </HeaderContent>
+    <RowTemplate>
+        <MudTd DataLabel="账号">
+            <div class="name">@context.DisplayName</div>
+            <div class="meta mono">@context.UserName</div>
+        </MudTd>
+        <MudTd DataLabel="角色">
+            <MudChip T="string" Size="Size.Small" Color="@RoleColor(context.Role)">@context.RoleName</MudChip>
+        </MudTd>
+        <MudTd DataLabel="状态">
+            @if (context.IsEnabled)
+            {
+                <MudChip T="string" Size="Size.Small" Color="Color.Success">启用</MudChip>
+            }
+            else
+            {
+                <MudChip T="string" Size="Size.Small" Color="Color.Default">停用</MudChip>
+            }
+        </MudTd>
+        <MudTd DataLabel="最近登录">
+            @(context.LastLoginAtUtc?.ToLocalTime().ToString("yyyy-MM-dd HH:mm") ?? "从未登录")
+        </MudTd>
+        <MudTd DataLabel="创建时间">@context.CreatedAtUtc.ToLocalTime().ToString("yyyy-MM-dd")</MudTd>
+        <MudTd DataLabel="操作">
+            <MudMenu Icon="@Icons.Material.Filled.MoreVert" Size="Size.Small" Dense="true">
+                <MudMenuItem Disabled="@(!CanTouch(context))" OnClick="@(() => EditAsync(context))">编辑 / 改角色</MudMenuItem>
+                <MudMenuItem Disabled="@(!CanTouch(context))" OnClick="@(() => ResetPasswordAsync(context))">重置密码</MudMenuItem>
+            </MudMenu>
+        </MudTd>
+    </RowTemplate>
+    <PagerContent>
+        <MudTablePager PageSizeOptions="new[] { 20, 50 }" RowsPerPageString="每页行数"
+                       InfoFormat="{first_item}-{last_item} / {all_items}" />
+    </PagerContent>
+</MudTable>
+
+@code {
+    private MudTable<ManagedUserDto>? _table;
+    private string? _keyword;
+    private string? _role;
+    private bool? _enabled;
+    private CancellationTokenSource? _loadCancellation;
+    private long _loadVersion;
+    private IReadOnlyList<ManagedUserDto> _pageItems = [];
+    private int _totalItems;
+
+    private bool CanTouch(ManagedUserDto user)
+        => Perms.CanManage && Permissions.Rank(user.Role) <= Permissions.Rank(Perms.Role);
+
+    private static Color RoleColor(string role) => role switch
+    {
+        "owner" => Color.Secondary,
+        "admin" => Color.Primary,
+        "member" => Color.Info,
+        _ => Color.Default,
+    };
+
+    private async Task<TableData<ManagedUserDto>> LoadServerData(TableState state, CancellationToken cancellationToken)
+    {
+        _loadCancellation?.Cancel();
+        _loadCancellation?.Dispose();
+        var loadCancellation = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+        _loadCancellation = loadCancellation;
+        var version = ++_loadVersion;
+
+        try
+        {
+            var response = await Api.QueryUsersAsync(new UserQuery
+            {
+                Page = state.Page + 1,
+                PageSize = state.PageSize,
+                Keyword = _keyword,
+                Role = _role,
+                IsEnabled = _enabled,
+            }, loadCancellation.Token);
+
+            if (version != _loadVersion || loadCancellation.IsCancellationRequested)
+            {
+                return CurrentTableData();
+            }
+
+            if (response.Code != BizCodes.Success || response.Data is null)
+            {
+                Api.NotifyIfFailed(response);
+                _pageItems = [];
+                _totalItems = 0;
+                return new TableData<ManagedUserDto> { Items = [], TotalItems = 0 };
+            }
+
+            _pageItems = response.Data.Items;
+            _totalItems = (int)response.Data.Total;
+            return CurrentTableData();
+        }
+        catch (OperationCanceledException) when (loadCancellation.IsCancellationRequested)
+        {
+            return CurrentTableData();
+        }
+        finally
+        {
+            if (ReferenceEquals(_loadCancellation, loadCancellation))
+            {
+                _loadCancellation = null;
+            }
+
+            loadCancellation.Dispose();
+        }
+    }
+
+    private TableData<ManagedUserDto> CurrentTableData() => new()
+    {
+        Items = _pageItems,
+        TotalItems = _totalItems,
+    };
+
+    private async Task OnKeywordKeyUp(KeyboardEventArgs args)
+    {
+        if (args.Key == "Enter")
+        {
+            await ReloadFirstPageAsync();
+        }
+    }
+
+    private async Task OnRoleChanged(string? role)
+    {
+        _role = role;
+        await ReloadFirstPageAsync();
+    }
+
+    private async Task OnEnabledChanged(bool? enabled)
+    {
+        _enabled = enabled;
+        await ReloadFirstPageAsync();
+    }
+
+    private async Task ReloadAsync()
+    {
+        if (_table is not null)
+        {
+            await _table.ReloadServerData();
+        }
+    }
+
+    private async Task ReloadFirstPageAsync()
+    {
+        if (_table is not null)
+        {
+            _table.NavigateTo(0);
+            await _table.ReloadServerData();
+        }
+    }
+
+    private async Task CreateAsync()
+    {
+        var dialog = await DialogService.ShowAsync<UserEditDialog>("新建账号", new DialogParameters<UserEditDialog>(),
+            new DialogOptions { MaxWidth = MaxWidth.Small, FullWidth = true });
+
+        if ((await dialog.Result) is { Canceled: false })
+        {
+            await ReloadAsync();
+        }
+    }
+
+    private async Task EditAsync(ManagedUserDto user)
+    {
+        var parameters = new DialogParameters<UserEditDialog>
+        {
+            { x => x.User, user },
+        };
+
+        var dialog = await DialogService.ShowAsync<UserEditDialog>("编辑账号", parameters,
+            new DialogOptions { MaxWidth = MaxWidth.Small, FullWidth = true });
+
+        if ((await dialog.Result) is { Canceled: false })
+        {
+            await ReloadAsync();
+        }
+    }
+
+    private async Task ResetPasswordAsync(ManagedUserDto user)
+    {
+        var parameters = new DialogParameters<ResetPasswordDialog>
+        {
+            { x => x.UserId, user.Id },
+            { x => x.UserName, user.UserName },
+        };
+
+        await DialogService.ShowAsync<ResetPasswordDialog>("重置密码", parameters,
+            new DialogOptions { MaxWidth = MaxWidth.ExtraSmall, FullWidth = true });
+    }
+}
+
+<style>
+    .name {
+        font-weight: 600;
+        color: #2b1214;
+    }
+
+    .meta {
+        font-size: 11px;
+        color: #9b8085;
+        margin-top: 2px;
+    }
+</style>

@@ -1,0 +1,154 @@
+@using Microsoft.Extensions.Configuration
+@inject ApiClient Api
+@inject IJSRuntime JS
+@inject ISnackbar Snackbar
+
+<MudDialog>
+    <TitleContent>
+        <MudText Typo="Typo.h6">转化回调密钥</MudText>
+    </TitleContent>
+    <DialogContent>
+        @if (_loading)
+        {
+            <MudProgressLinear Color="Color.Primary" Indeterminate="true" Class="mt-4" />
+        }
+        else if (_key is null)
+        {
+            <MudAlert Severity="Severity.Error" Dense="true" Class="mt-2">@(_error ?? "无法获取密钥")</MudAlert>
+        }
+        else
+        {
+            <MudStack Spacing="3" Class="mt-2">
+                <MudAlert Severity="Severity.Warning" Dense="true">
+                    密钥只在服务端使用，泄露等同于可伪造任意转化。请勿写入前端代码或公开仓库。
+                </MudAlert>
+
+                <MudPaper Elevation="0" Class="panel pa-3">
+                    <MudText Typo="Typo.caption" Class="hint">短链</MudText>
+                    <MudText Typo="Typo.body2" Class="mono">@_key.LinkCode（ID @_key.LinkId）</MudText>
+
+                    <MudText Typo="Typo.caption" Class="hint mt-3">密钥</MudText>
+                    <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="2">
+                        <MudText Typo="Typo.body2" Class="mono secret">@_key.Secret</MudText>
+                        <MudIconButton Icon="@Icons.Material.Filled.ContentCopy" Size="Size.Small"
+                                       OnClick="CopySecretAsync" />
+                    </MudStack>
+
+                    <MudText Typo="Typo.caption" Class="hint mt-3">签名算法</MudText>
+                    <MudText Typo="Typo.body2" Class="mono">@_key.Algorithm · @_key.HeaderName: @_key.SignatureFormat</MudText>
+
+                    <MudText Typo="Typo.caption" Class="hint mt-3">待签内容</MudText>
+                    <MudText Typo="Typo.body2" Class="mono">@_key.SignedPayloadFormat</MudText>
+                </MudPaper>
+
+                <MudText Typo="Typo.subtitle2">调用示例</MudText>
+                <pre class="code">curl -X POST "@CallbackUrl" \
+  -H "Content-Type: application/json" \
+  -H "X-Timestamp: $TS" \
+  -H "X-Signature: sha256=$SIG" \
+  -d '{"linkId":@_key.LinkId,"eventId":"order-10086","metric":"conversion","value":199.00}'</pre>
+
+                <MudText Typo="Typo.caption" Class="hint">
+                    其中 TS 取 Unix 秒级时间戳（与服务器时差 5 分钟内），
+                    SIG = HMAC-SHA256(密钥, TS + "." + 原始请求体) 的十六进制小写。
+                    同一短链下 eventId 重复提交只会计一次。
+                </MudText>
+            </MudStack>
+        }
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="Close">关闭</MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [CascadingParameter]
+    private IMudDialogInstance MudDialog { get; set; } = default!;
+
+    [Parameter]
+    public long LinkId { get; set; }
+
+    private ConversionKeyDto? _key;
+    private bool _loading = true;
+    private string? _error;
+
+    /// <summary>回调地址取当前站点地址推导，去掉前端自身的路径，指到 API 的转化端点。</summary>
+    private string CallbackUrl => $"{(string.IsNullOrWhiteSpace(_apiBase) ? "https://your-api" : _apiBase)}/api/v1/conversions";
+
+    private string? _apiBase;
+
+    [Inject]
+    private IConfiguration Configuration { get; set; } = default!;
+
+    protected override async Task OnInitializedAsync()
+    {
+        _apiBase = Configuration["ApiBaseUrl"]?.TrimEnd('/');
+
+        try
+        {
+            var response = await Api.GetConversionKeyAsync(LinkId);
+            if (response.Code == BizCodes.Success && response.Data is not null)
+            {
+                _key = response.Data;
+                return;
+            }
+
+            _error = ErrorMessages.From(response.Code, response.Msg);
+        }
+        finally
+        {
+            _loading = false;
+        }
+    }
+
+    private async Task CopySecretAsync()
+    {
+        if (_key is null)
+        {
+            return;
+        }
+
+        try
+        {
+            await JS.InvokeVoidAsync("navigator.clipboard.writeText", _key.Secret);
+            Snackbar.Add("密钥已复制", Severity.Success);
+        }
+        catch (JSException)
+        {
+            Snackbar.Add("复制失败，请手动选中复制", Severity.Warning);
+        }
+    }
+
+    private void Close() => MudDialog.Close();
+}
+
+<style>
+    .panel {
+        border: 1px solid #f0e4e6;
+        border-radius: 12px;
+        background: #fffafb;
+    }
+
+    .secret {
+        word-break: break-all;
+        color: #8c0619;
+        font-weight: 600;
+    }
+
+    .code {
+        margin: 0;
+        padding: 12px 14px;
+        border-radius: 12px;
+        background: #2b1214;
+        color: #ffe9ec;
+        font-size: 12px;
+        line-height: 1.6;
+        overflow-x: auto;
+        white-space: pre;
+    }
+
+    .hint {
+        font-size: 12px;
+        color: #9b8085;
+    }
+</style>

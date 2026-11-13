@@ -1,0 +1,22 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <RootNamespace>ShortLink.Application</RootNamespace>
+    <AssemblyName>ShortLink.Application</AssemblyName>
+    <Description>应用层：用例编排、端口接口（仓储/缓存/时钟/密码/令牌）、入参校验。禁止引用 EF Core 与 ASP.NET Core。</Description>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\ShortLink.Contracts\ShortLink.Contracts.csproj" />
+    <ProjectReference Include="..\ShortLink.Domain\ShortLink.Domain.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="FluentValidation" />
+    <PackageReference Include="FluentValidation.DependencyInjectionExtensions" />
+    <!-- IOptions / ILogger：应用层需要读取安全与跳转配置、记录旁路失败日志 -->
+    <PackageReference Include="Microsoft.Extensions.Options.ConfigurationExtensions" />
+    <PackageReference Include="Microsoft.Extensions.Logging.Abstractions" />
+  </ItemGroup>
+
+</Project>

@@ -1,0 +1,5 @@
+{
+  "appHost": {
+    "path": "src/ShortLink.AppHost/ShortLink.AppHost.csproj"
+  }
+}

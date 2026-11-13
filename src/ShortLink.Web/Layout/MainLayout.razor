@@ -1,0 +1,75 @@
+@inherits LayoutComponentBase
+@inject JwtAuthenticationStateProvider AuthState
+@inject TokenStore TokenStore
+@inject IDialogService DialogService
+@inject Permissions Perms
+
+<MudLayout>
+    <MudAppBar Elevation="0" Color="Color.Primary">
+        <MudIconButton Icon="@Icons.Material.Filled.Menu"
+                       Color="Color.Inherit"
+                       Edge="Edge.Start"
+                       OnClick="ToggleDrawer" />
+        <MudText Typo="Typo.h6" Class="ml-2 brand">ShortLink</MudText>
+        <MudSpacer />
+        <MudChip T="string" Size="Size.Small" Class="mr-2 role-chip hide-xs">@Perms.RoleName</MudChip>
+        <MudText Typo="Typo.body2" Class="mr-3 hide-xs">
+            @(TokenStore.User?.DisplayName ?? TokenStore.User?.UserName)
+        </MudText>
+        <MudMenu Icon="@Icons.Material.Filled.AccountCircle" Color="Color.Inherit" AnchorOrigin="Origin.BottomRight">
+            <MudMenuItem OnClick="OpenChangePassword">修改密码</MudMenuItem>
+            <MudMenuItem OnClick="LogoutAsync">退出登录</MudMenuItem>
+        </MudMenu>
+    </MudAppBar>
+
+    <MudDrawer @bind-Open="_drawerOpen"
+               Elevation="0"
+               Variant="@DrawerVariant.Responsive"
+               ClipMode="DrawerClipMode.Always">
+        <MudNavMenu Class="pa-2">
+            <MudNavLink Href="/" Match="NavLinkMatch.All" Icon="@Icons.Material.Filled.SpaceDashboard">控制台</MudNavLink>
+            <MudNavLink Href="/links" Icon="@Icons.Material.Filled.Link">短链管理</MudNavLink>
+            <MudNavLink Href="/domains" Icon="@Icons.Material.Filled.Dns">域名管理</MudNavLink>
+            @if (Perms.CanManage)
+            {
+                <MudNavLink Href="/security" Icon="@Icons.Material.Filled.Shield">安全事件</MudNavLink>
+                <MudNavLink Href="/users" Icon="@Icons.Material.Filled.ManageAccounts">账号与角色</MudNavLink>
+            }
+        </MudNavMenu>
+    </MudDrawer>
+
+    <MudMainContent>
+        <MudContainer MaxWidth="MaxWidth.ExtraLarge" Class="my-6">
+            @Body
+        </MudContainer>
+    </MudMainContent>
+</MudLayout>
+
+@code {
+    private bool _drawerOpen = true;
+
+    private void ToggleDrawer() => _drawerOpen = !_drawerOpen;
+
+    private async Task OpenChangePassword()
+    {
+        var parameters = new DialogParameters<ChangePasswordDialog>();
+        await DialogService.ShowAsync<ChangePasswordDialog>("修改密码", parameters,
+            new DialogOptions { MaxWidth = MaxWidth.Small, FullWidth = true });
+    }
+
+    private async Task LogoutAsync() => await AuthState.SignOutAsync(redirectToLogin: true);
+}
+
+<style>
+    .brand {
+        letter-spacing: .16em;
+        font-weight: 700;
+        text-transform: uppercase;
+    }
+
+    .role-chip {
+        background: rgba(255, 255, 255, .18) !important;
+        color: #fff !important;
+        font-size: 11px;
+    }
+</style>

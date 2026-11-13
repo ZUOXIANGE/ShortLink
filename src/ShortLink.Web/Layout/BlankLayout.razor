@@ -1,0 +1,18 @@
+@inherits LayoutComponentBase
+
+<div class="blank-layout">
+    @Body
+</div>
+
+<style>
+    .blank-layout {
+        min-height: 100vh;
+        display: grid;
+        place-items: center;
+        padding: 24px;
+        background:
+            radial-gradient(900px 420px at 12% 8%, #ffe4e8 0%, transparent 60%),
+            radial-gradient(700px 380px at 88% 92%, #ffecef 0%, transparent 62%),
+            #f7f5f6;
+    }
+</style>

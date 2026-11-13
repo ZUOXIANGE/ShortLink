@@ -1,0 +1,9 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <RootNamespace>ShortLink.Domain</RootNamespace>
+    <AssemblyName>ShortLink.Domain</AssemblyName>
+    <Description>领域层：实体、值对象与不依赖任何框架的业务规则。禁止引用 EF Core / ASP.NET Core。</Description>
+  </PropertyGroup>
+
+</Project>

@@ -1,0 +1,267 @@
+@page "/links/{Id:long}/stats"
+@attribute [Authorize]
+@inject ApiClient Api
+@inject NavigationManager Navigation
+@inject ISnackbar Snackbar
+@inject FileSaver Saver
+
+<div class="d-flex align-center justify-space-between mb-4 flex-wrap gap-2">
+    <div>
+        <MudButton Href="/links" Variant="Variant.Text" Color="Color.Primary" StartIcon="@Icons.Material.Filled.ArrowBack" Class="px-0">
+            返回短链列表
+        </MudButton>
+        <h1 class="page-title">访问统计</h1>
+        @if (_stats is not null)
+        {
+            <p class="page-subtitle mono">@_stats.ShortUrl</p>
+        }
+    </div>
+    <MudStack Row="true" Spacing="2" AlignItems="AlignItems.Center">
+        <MudButton Variant="Variant.Outlined" Color="Color.Primary" StartIcon="@Icons.Material.Filled.FileDownload"
+                   OnClick="ExportClicksAsync" Disabled="_exporting">
+            导出明细
+        </MudButton>
+        <MudSelect T="int" Value="_days" ValueChanged="OnDaysChanged" Dense="true" Variant="Variant.Outlined" Style="width:130px;">
+            <MudSelectItem T="int" Value="7">近 7 天</MudSelectItem>
+            <MudSelectItem T="int" Value="14">近 14 天</MudSelectItem>
+            <MudSelectItem T="int" Value="30">近 30 天</MudSelectItem>
+            <MudSelectItem T="int" Value="90">近 90 天</MudSelectItem>
+        </MudSelect>
+    </MudStack>
+</div>
+
+@if (_loading)
+{
+    <MudProgressLinear Color="Color.Primary" Indeterminate="true" Class="mb-4" />
+}
+
+@if (_stats is null)
+{
+    <MudAlert Severity="Severity.Warning" Variant="Variant.Outlined">@(_error ?? "暂无统计数据")</MudAlert>
+}
+else
+{
+    <MudGrid Spacing="3">
+        <MudItem xs="12" sm="6" md="3">
+            <MudPaper Elevation="0" Class="kpi pa-4">
+                <div class="kpi-label">累计点击</div>
+                <div class="kpi-value">@_stats.TotalClicks</div>
+            </MudPaper>
+        </MudItem>
+        <MudItem xs="12" sm="6" md="3">
+            <MudPaper Elevation="0" Class="kpi pa-4">
+                <div class="kpi-label">区间独立访客</div>
+                <div class="kpi-value">@_stats.UniqueVisitors</div>
+            </MudPaper>
+        </MudItem>
+        <MudItem xs="12" sm="6" md="3">
+            <MudPaper Elevation="0" class="kpi pa-4">
+                <div class="kpi-label">今日点击</div>
+                <div class="kpi-value">@_stats.TodayClicks</div>
+            </MudPaper>
+        </MudItem>
+        <MudItem xs="12" sm="6" md="3">
+            <MudPaper Elevation="0" Class="kpi pa-4">
+                <div class="kpi-label">转化（@_stats.Days 天）</div>
+                <div class="kpi-value">@_stats.Conversions</div>
+                <div class="kpi-foot">价值 @_stats.ConversionValue.ToString("0.##")</div>
+            </MudPaper>
+        </MudItem>
+
+        <MudItem xs="12">
+            <ClickTrend Data="_stats.Trend" />
+        </MudItem>
+
+        @if (_stats.Variants.Count > 0)
+        {
+            <MudItem xs="12">
+                <MudPaper Elevation="0" Class="panel pa-4">
+                    <MudText Typo="Typo.subtitle2" Class="mb-2">分支效果（条件路由 / A/B 实验）</MudText>
+                    <MudSimpleTable Dense="true" Hover="true" Elevation="0">
+                        <thead>
+                            <tr>
+                                <th>分支</th>
+                                <th style="text-align:right;">点击</th>
+                                <th style="text-align:right;">占比</th>
+                                <th style="text-align:right;">转化</th>
+                                <th style="text-align:right;">转化率</th>
+                                <th style="text-align:right;">转化价值</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach (var variant in _stats.Variants)
+                            {
+                                <tr>
+                                    <td>@variant.Name</td>
+                                    <td style="text-align:right;">@variant.Clicks</td>
+                                    <td style="text-align:right;">@variant.Share.ToString("0.##")%</td>
+                                    <td style="text-align:right;">@variant.Conversions</td>
+                                    <td style="text-align:right;">@(variant.ConversionRate.ToString("0.##"))%</td>
+                                    <td style="text-align:right;">@variant.ConversionValue.ToString("0.##")</td>
+                                </tr>
+                            }
+                        </tbody>
+                    </MudSimpleTable>
+                    <MudText Typo="Typo.caption" Class="hint mt-2">
+                        占比按区间内点击计算；转化率 = 该分支转化数 / 该分支点击。
+                    </MudText>
+                </MudPaper>
+            </MudItem>
+        }
+
+        <MudItem xs="12" md="6">
+            <DimensionList Title="来源 Referer" Items="_stats.Referers" />
+        </MudItem>
+        <MudItem xs="12" md="6">
+            <DimensionList Title="设备" Items="_stats.Devices" />
+        </MudItem>
+        <MudItem xs="12" md="4">
+            <DimensionList Title="浏览器" Items="_stats.Browsers" />
+        </MudItem>
+        <MudItem xs="12" md="4">
+            <DimensionList Title="操作系统" Items="_stats.OperatingSystems" />
+        </MudItem>
+        <MudItem xs="12" md="4">
+            <DimensionList Title="国家 / 地区" Items="_stats.Countries" />
+        </MudItem>
+
+        <MudItem xs="12">
+            <MudPaper Elevation="0" Class="pa-4" Style="border:1px solid #F0E4E6;border-radius:14px;">
+                <MudText Typo="Typo.subtitle2" Class="mb-2">最近访问明细</MudText>
+                <MudSimpleTable Dense="true" Hover="true" Elevation="0">
+                    <thead>
+                        <tr>
+                            <th>时间（本地）</th>
+                            <th>IP</th>
+                            <th>来源</th>
+                            <th>设备</th>
+                            <th>浏览器</th>
+                            <th>系统</th>
+                            <th>机器人</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @if (_clicks.Count == 0)
+                        {
+                            <tr><td colspan="7" style="text-align:center;color:#8a6a6f;">暂无访问记录</td></tr>
+                        }
+                        @foreach (var click in _clicks)
+                        {
+                            <tr>
+                                <td>@click.ClickedAtUtc.ToLocalTime().ToString("MM-dd HH:mm:ss")</td>
+                                <td class="mono">@(click.Ip ?? "-")</td>
+                                <td class="truncate">@(click.Referer ?? "直接访问")</td>
+                                <td>@(click.Device ?? "-")</td>
+                                <td>@(click.Browser ?? "-")</td>
+                                <td>@(click.OperatingSystem ?? "-")</td>
+                                <td>@(click.IsBot ? "是" : "否")</td>
+                            </tr>
+                        }
+                    </tbody>
+                </MudSimpleTable>
+                <MudText Typo="Typo.caption" Class="hint mt-2">
+                    点击数据由跳转链路异步落库，最近几秒的记录可能尚未出现。
+                </MudText>
+            </MudPaper>
+        </MudItem>
+    </MudGrid>
+}
+
+@code {
+    [Parameter]
+    public long Id { get; set; }
+
+    private LinkStatsDto? _stats;
+    private IReadOnlyList<ClickLogDto> _clicks = [];
+    private bool _loading = true;
+    private bool _exporting;
+    private string? _error;
+    private int _days = 30;
+
+    protected override async Task OnParametersSetAsync() => await LoadAsync();
+
+    private async Task OnDaysChanged(int days)
+    {
+        _days = days;
+        await LoadAsync();
+    }
+
+    private async Task LoadAsync()
+    {
+        _loading = true;
+        try
+        {
+            var statsTask = Api.GetLinkStatsAsync(Id, _days);
+            var clicksTask = Api.GetRecentClicksAsync(Id, 30);
+            await Task.WhenAll(statsTask, clicksTask);
+
+            var stats = await statsTask;
+            if (stats.Code == BizCodes.Success && stats.Data is not null)
+            {
+                _stats = stats.Data;
+                _error = null;
+            }
+            else
+            {
+                _error = ErrorMessages.From(stats.Code, stats.Msg);
+                Api.NotifyIfFailed(stats);
+            }
+
+            var clicks = await clicksTask;
+            if (clicks.Code == BizCodes.Success && clicks.Data is not null)
+            {
+                _clicks = clicks.Data;
+            }
+        }
+        finally
+        {
+            _loading = false;
+        }
+    }
+
+    private async Task ExportClicksAsync()
+    {
+        _exporting = true;
+        try
+        {
+            var result = await Api.ExportClicksAsync(Id, _days);
+            if (!result.Success || result.Bytes is null)
+            {
+                Snackbar.Add(result.Error ?? "导出失败", Severity.Error);
+                return;
+            }
+
+            var saved = await Saver.SaveAsync(result.FileName ?? $"clicks-{Id}.csv", "text/csv;charset=utf-8", result.Bytes);
+            Snackbar.Add(saved ? "已开始下载" : "浏览器拒绝了下载，请检查下载权限",
+                saved ? Severity.Success : Severity.Warning);
+        }
+        finally
+        {
+            _exporting = false;
+        }
+    }
+}
+
+<style>
+    .kpi {
+        border: 1px solid #F0E4E6;
+        border-radius: 14px;
+        background: #fff;
+    }
+
+    .kpi-foot {
+        margin-top: 8px;
+        font-size: 12px;
+        color: #9b8085;
+    }
+
+    .panel {
+        border: 1px solid #F0E4E6;
+        border-radius: 14px;
+    }
+
+    .hint {
+        font-size: 12px;
+        color: #9b8085;
+    }
+</style>

@@ -1,0 +1,55 @@
+## .NET / 构建产物
+bin/
+obj/
+artifacts/
+*.user
+*.suo
+*.userosscache
+*.sln.docstates
+[Dd]ebug/
+[Rr]elease/
+x64/
+x86/
+*.dll
+*.pdb
+*.nupkg
+*.snupkg
+
+## 测试
+TestResults/
+coverage*.json
+coverage*.xml
+coverage*.info
+*.trx
+
+## IDE
+.vs/
+.vscode/
+.idea/
+*.swp
+*.DotSettings.user
+
+## 运行时数据（短链平台默认 SQLite 与日志目录）
+src/ShortLink.Api/data/
+src/ShortLink.Api/logs/
+*.db
+*.db-shm
+*.db-wal
+*.sqlite
+*.sqlite3
+
+## 环境与密钥
+.env
+.env.*
+appsettings.Development.local.json
+appsettings.*.local.json
+*.pfx
+*.key
+
+## 前端
+wwwroot/_framework/
+
+## 本地数据库文件
+*.db
+*.db-shm
+*.db-wal

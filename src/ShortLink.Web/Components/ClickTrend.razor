@@ -1,0 +1,109 @@
+@* 轻量趋势图：不引入图表库，用纯 CSS 柱状图展示每日点击与独立访客 *@
+<MudPaper Elevation="0" Class="pa-4" Style="border:1px solid #F0E4E6;border-radius:14px;">
+    <div class="d-flex align-center justify-space-between mb-2">
+        <MudText Typo="Typo.subtitle2">访问趋势</MudText>
+        <div class="d-flex align-center">
+            <span class="legend legend-clicks"></span>
+            <MudText Typo="Typo.caption" Class="mr-4">点击</MudText>
+            <span class="legend legend-visitors"></span>
+            <MudText Typo="Typo.caption">独立访客</MudText>
+        </div>
+    </div>
+
+    @if (Data.Count == 0)
+    {
+        <MudText Typo="Typo.body2" Class="py-8" Align="Align.Center">暂无数据</MudText>
+    }
+    else
+    {
+        <div class="chart">
+            @foreach (var item in Data)
+            {
+                var height = Percent(item.Clicks);
+                var visitorHeight = Percent(item.UniqueVisitors);
+                <div class="chart-col" title="@($"{item.Date:yyyy-MM-dd} 点击 {item.Clicks} / 访客 {item.UniqueVisitors}")">
+                    <div class="chart-bars">
+                        <div class="bar bar-clicks" style="height:@($"{height:0.#}")%"></div>
+                        <div class="bar bar-visitors" style="height:@($"{visitorHeight:0.#}")%"></div>
+                    </div>
+                    <span class="chart-label">@item.Date.ToString("MM-dd")</span>
+                </div>
+            }
+        </div>
+    }
+</MudPaper>
+
+@code {
+    [Parameter]
+    public IReadOnlyList<DailyClickDto> Data { get; set; } = [];
+
+    private long _max;
+
+    protected override void OnParametersSet()
+    {
+        _max = Data.Count == 0 ? 0 : Math.Max(1, Data.Max(d => d.Clicks));
+    }
+
+    private double Percent(long value) => _max == 0 ? 0 : Math.Round(value * 100d / _max, 1);
+}
+
+<style>
+    .chart {
+        display: flex;
+        align-items: flex-end;
+        gap: 6px;
+        height: 180px;
+        padding-top: 8px;
+        overflow-x: auto;
+    }
+
+    .chart-col {
+        flex: 1 0 22px;
+        display: flex;
+        flex-direction: column;
+        justify-content: flex-end;
+        height: 100%;
+        text-align: center;
+    }
+
+    .chart-bars {
+        flex: 1;
+        display: flex;
+        align-items: flex-end;
+        justify-content: center;
+        gap: 3px;
+    }
+
+    .bar {
+        width: 8px;
+        min-height: 2px;
+        border-radius: 4px 4px 2px 2px;
+        transition: height .3s ease;
+    }
+
+    .bar-clicks {
+        background: linear-gradient(180deg, #d70b2a, #8c0619);
+    }
+
+    .bar-visitors {
+        background: #f6c2ca;
+    }
+
+    .chart-label {
+        font-size: 10px;
+        color: #8a6a6f;
+        margin-top: 6px;
+        white-space: nowrap;
+    }
+
+    .legend {
+        width: 10px;
+        height: 10px;
+        border-radius: 3px;
+        display: inline-block;
+        margin-right: 4px;
+    }
+
+    .legend-clicks { background: #d70b2a; }
+    .legend-visitors { background: #f6c2ca; }
+</style>

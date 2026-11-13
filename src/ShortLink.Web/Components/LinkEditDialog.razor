@@ -1,0 +1,341 @@
+@inject ApiClient Api
+@inject ISnackbar Snackbar
+
+<MudDialog>
+    <TitleContent>
+        <MudText Typo="Typo.h6">@(IsEdit ? "编辑短链" : "新建短链")</MudText>
+    </TitleContent>
+    <DialogContent>
+        <MudStack Spacing="3" Class="mt-2">
+            <MudTextField @bind-Value="_targetUrl"
+                          Label="目标地址"
+                          Placeholder="https://example.com/landing"
+                          Variant="Variant.Outlined"
+                          Margin="Margin.Dense"
+                          Immediate="true" />
+
+            <MudGrid Spacing="2">
+                <MudItem xs="12" sm="7">
+                    <MudSelect T="long?"
+                               @bind-Value="_domainId"
+                               Label="短链域名"
+                               Variant="Variant.Outlined"
+                               Margin="Margin.Dense"
+                               Disabled="@IsEdit">
+                        @foreach (var domain in Domains)
+                        {
+                            <MudSelectItem T="long?" Value="@((long?)domain.Id)">
+                                @($"{domain.Host}（{domain.Scheme}）{(domain.IsDefault ? " · 默认" : string.Empty)}")
+                            </MudSelectItem>
+                        }
+                    </MudSelect>
+                </MudItem>
+                <MudItem xs="12" sm="5">
+                    <MudSelect T="int" @bind-Value="_redirectType" Label="跳转类型"
+                               Variant="Variant.Outlined" Margin="Margin.Dense">
+                        <MudSelectItem T="int" Value="302">302 临时</MudSelectItem>
+                        <MudSelectItem T="int" Value="301">301 永久</MudSelectItem>
+                        <MudSelectItem T="int" Value="307">307 临时保方法</MudSelectItem>
+                        <MudSelectItem T="int" Value="308">308 永久保方法</MudSelectItem>
+                    </MudSelect>
+                </MudItem>
+            </MudGrid>
+
+            <MudTextField @bind-Value="_code"
+                          Label="自定义短码"
+                          HelperText="@(IsEdit ? "短码创建后不可修改" : "留空自动生成，3~32 位字母数字")"
+                          Variant="Variant.Outlined"
+                          Margin="Margin.Dense"
+                          Disabled="@IsEdit" />
+
+            <MudTextField @bind-Value="_title"
+                          Label="标题（可选）"
+                          Variant="Variant.Outlined"
+                          Margin="Margin.Dense" />
+
+            <MudText Typo="Typo.caption" Class="hint">投放时间窗：留空表示立即生效、永不过期。</MudText>
+            <MudGrid Spacing="2">
+                <MudItem xs="12" sm="6">
+                    <MudStack Row="true" Spacing="2">
+                        <MudDatePicker @bind-Date="_startsAtDate" Label="生效日期" Variant="Variant.Outlined"
+                                       Margin="Margin.Dense" DateFormat="yyyy-MM-dd" Clearable="true" />
+                        <div style="width:120px;">
+                            <MudTimePicker @bind-Time="_startsAtTime" Label="时间" Variant="Variant.Outlined"
+                                           Margin="Margin.Dense" Clearable="true" />
+                        </div>
+                    </MudStack>
+                </MudItem>
+                <MudItem xs="12" sm="6">
+                    <MudStack Row="true" Spacing="2">
+                        <MudDatePicker @bind-Date="_expiresAtDate" Label="过期日期" Variant="Variant.Outlined"
+                                       Margin="Margin.Dense" DateFormat="yyyy-MM-dd" Clearable="true" />
+                        <div style="width:120px;">
+                            <MudTimePicker @bind-Time="_expiresAtTime" Label="时间" Variant="Variant.Outlined"
+                                           Margin="Margin.Dense" Clearable="true" />
+                        </div>
+                    </MudStack>
+                </MudItem>
+            </MudGrid>
+
+            <MudTextField @bind-Value="_password"
+                          Label="访问密码（可选）"
+                          HelperText="@(IsEdit ? "留空表示不修改，填写新密码即覆盖" : "设置后访问者需输入密码")"
+                          Variant="Variant.Outlined"
+                          Margin="Margin.Dense" />
+
+            <MudTextField @bind-Value="_remark"
+                          Label="备注（可选）"
+                          Variant="Variant.Outlined"
+                          Margin="Margin.Dense"
+                          Lines="2" />
+
+            <MudSwitch @bind-Value="_enabled" Color="Color.Primary" Label="启用" />
+
+            <MudExpansionPanels Elevation="0" Class="advanced">
+                <MudExpansionPanel Text="高级设置（安全 / 归因）" Dense="true" Icon="@Icons.Material.Filled.Tune">
+                    <MudStack Spacing="3" Class="pt-2">
+                        <MudGrid Spacing="2">
+                            <MudItem xs="12" sm="6">
+                                <MudNumericField T="long?" @bind-Value="_maxClicks"
+                                                 Label="点击封顶"
+                                                 HelperText="达到上限自动停用；留空不限制"
+                                                 Variant="Variant.Outlined" Margin="Margin.Dense" Min="0" />
+                            </MudItem>
+                            <MudItem xs="12" sm="6">
+                                <MudSelect T="string" @bind-Value="_botPolicy" Label="机器人策略"
+                                           Variant="Variant.Outlined" Margin="Margin.Dense">
+                                    <MudSelectItem T="string" Value="@BotPolicies.Allow">放行并计数</MudSelectItem>
+                                    <MudSelectItem T="string" Value="@BotPolicies.IgnoreCount">放行但不计数</MudSelectItem>
+                                    <MudSelectItem T="string" Value="@BotPolicies.Block">直接拦截</MudSelectItem>
+                                </MudSelect>
+                            </MudItem>
+                        </MudGrid>
+
+                        <MudTextField @bind-Value="_ipAllowList"
+                                      Label="IP 白名单（可选）"
+                                      HelperText="支持单 IP 与 CIDR（如 10.0.0.0/8），逗号或换行分隔；填写后仅这些来源可访问"
+                                      Variant="Variant.Outlined" Margin="Margin.Dense" Lines="2" />
+
+                        <MudTextField @bind-Value="_ipBlockList"
+                                      Label="IP 黑名单（可选）"
+                                      HelperText="优先于白名单；命中即拒绝"
+                                      Variant="Variant.Outlined" Margin="Margin.Dense" Lines="2" />
+
+                        <MudTextField @bind-Value="_fallbackUrl"
+                                      Label="兜底地址（可选）"
+                                      HelperText="条件路由全部未命中时使用；留空则回落到目标地址"
+                                      Variant="Variant.Outlined" Margin="Margin.Dense" Immediate="true" />
+
+                        <div>
+                            <MudSwitch @bind-Value="_antiBlockEnabled" Color="Color.Primary"
+                                       Label="微信 / QQ 内展示防红中间页" />
+                            <MudText Typo="Typo.caption" Class="hint">
+                                先展示跳转提示页，避免链接在聊天窗口被直接拦截。
+                            </MudText>
+                        </div>
+                    </MudStack>
+                </MudExpansionPanel>
+            </MudExpansionPanels>
+
+            @if (!string.IsNullOrEmpty(_error))
+            {
+                <MudAlert Severity="Severity.Error" Dense="true">@_error</MudAlert>
+            }
+        </MudStack>
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="Cancel">取消</MudButton>
+        <MudButton Color="Color.Primary" Variant="Variant.Filled" OnClick="SubmitAsync" Disabled="_busy">
+            @(IsEdit ? "保存" : "创建")
+        </MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [CascadingParameter]
+    private IMudDialogInstance MudDialog { get; set; } = default!;
+
+    [Parameter]
+    public LinkDto? Link { get; set; }
+
+    [Parameter]
+    public IReadOnlyList<DomainDto> Domains { get; set; } = [];
+
+    private string _targetUrl = string.Empty;
+    private long? _domainId;
+    private string? _code;
+    private string? _title;
+    private int _redirectType = 302;
+    private DateTime? _expiresAtDate;
+    private TimeSpan? _expiresAtTime;
+    private DateTime? _startsAtDate;
+    private TimeSpan? _startsAtTime;
+    private string? _password;
+    private string? _remark;
+    private bool _enabled = true;
+    private long? _maxClicks;
+    private string _botPolicy = BotPolicies.Allow;
+    private string? _ipAllowList;
+    private string? _ipBlockList;
+    private string? _fallbackUrl;
+    private bool _antiBlockEnabled;
+    private string? _error;
+    private bool _busy;
+
+    private bool IsEdit => Link is not null;
+
+    protected override void OnInitialized()
+    {
+        if (Link is not null)
+        {
+            _targetUrl = Link.TargetUrl;
+            _domainId = Link.DomainId;
+            _code = Link.Code;
+            _title = Link.Title;
+            _redirectType = Link.RedirectType;
+            (_expiresAtDate, _expiresAtTime) = Split(Link.ExpiresAtUtc);
+            (_startsAtDate, _startsAtTime) = Split(Link.StartsAtUtc);
+            _remark = Link.Remark;
+            _enabled = Link.Status == "enabled";
+            _maxClicks = Link.MaxClicks;
+            _botPolicy = string.IsNullOrWhiteSpace(Link.BotPolicy) ? BotPolicies.Allow : Link.BotPolicy;
+            _ipAllowList = Link.IpAllowList;
+            _ipBlockList = Link.IpBlockList;
+            _fallbackUrl = Link.FallbackUrl;
+            _antiBlockEnabled = Link.AntiBlockEnabled;
+            return;
+        }
+
+        _domainId = Domains.FirstOrDefault(d => d.IsDefault && d.IsEnabled)?.Id
+                    ?? Domains.FirstOrDefault(d => d.IsEnabled)?.Id;
+    }
+
+    private void Cancel() => MudDialog.Cancel();
+
+    private async Task SubmitAsync()
+    {
+        _error = null;
+
+        if (string.IsNullOrWhiteSpace(_targetUrl))
+        {
+            _error = "请填写目标地址";
+            return;
+        }
+
+        var expiresAt = Combine(_expiresAtDate, _expiresAtTime, endOfDay: true);
+        var startsAt = Combine(_startsAtDate, _startsAtTime, endOfDay: false);
+
+        if (expiresAt is not null && startsAt is not null && expiresAt <= startsAt)
+        {
+            _error = "过期时间必须晚于生效时间";
+            return;
+        }
+
+        _busy = true;
+        try
+        {
+            ApiResponse<LinkDto> response;
+
+            if (Link is null)
+            {
+                response = await Api.CreateLinkAsync(new CreateLinkRequest
+                {
+                    DomainId = _domainId,
+                    TargetUrl = _targetUrl.Trim(),
+                    Code = string.IsNullOrWhiteSpace(_code) ? null : _code.Trim(),
+                    Title = _title,
+                    RedirectType = _redirectType,
+                    ExpiresAtUtc = expiresAt,
+                    StartsAtUtc = startsAt,
+                    Password = string.IsNullOrEmpty(_password) ? null : _password,
+                    Remark = _remark,
+                    Enabled = _enabled,
+                    MaxClicks = _maxClicks,
+                    BotPolicy = _botPolicy,
+                    IpAllowList = _ipAllowList,
+                    IpBlockList = _ipBlockList,
+                    FallbackUrl = _fallbackUrl,
+                    AntiBlockEnabled = _antiBlockEnabled,
+                });
+            }
+            else
+            {
+                response = await Api.UpdateLinkAsync(Link.Id, new UpdateLinkRequest
+                {
+                    TargetUrl = _targetUrl.Trim(),
+                    Title = _title,
+                    RedirectType = _redirectType,
+                    ExpiresAtUtc = expiresAt,
+                    StartsAtUtc = startsAt,
+                    Password = _password,
+                    Remark = _remark,
+                    Enabled = _enabled,
+                    MaxClicks = _maxClicks,
+                    BotPolicy = _botPolicy,
+                    IpAllowList = _ipAllowList,
+                    IpBlockList = _ipBlockList,
+                    FallbackUrl = _fallbackUrl,
+                    AntiBlockEnabled = _antiBlockEnabled,
+                });
+            }
+
+            if (response.Code == BizCodes.Success)
+            {
+                Snackbar.Add(IsEdit ? "短链已更新" : "短链已创建", Severity.Success);
+                MudDialog.Close(DialogResult.Ok(true));
+                return;
+            }
+
+            _error = FirstError(response) ?? ErrorMessages.From(response.Code, response.Msg);
+        }
+        finally
+        {
+            _busy = false;
+        }
+    }
+
+    /// <summary>UTC 时间拆成本地的日期 + 时间，供两个选择器分别绑定。</summary>
+    private static (DateTime? Date, TimeSpan? Time) Split(DateTime? utc)
+    {
+        if (utc is not { } value)
+        {
+            return (null, null);
+        }
+
+        var local = value.ToLocalTime();
+        return (local.Date, local.TimeOfDay);
+    }
+
+    /// <summary>
+    /// 日期 + 时间合成 UTC。时间留空时按天兜底：生效取 00:00，过期取 23:59，
+    /// 这样「只选日期」的用户不会得到当天零点就过期这种反直觉结果。
+    /// </summary>
+    private static DateTime? Combine(DateTime? date, TimeSpan? time, bool endOfDay)
+    {
+        if (date is not { } value)
+        {
+            return null;
+        }
+
+        var clock = time ?? (endOfDay ? new TimeSpan(23, 59, 59) : TimeSpan.Zero);
+        var local = DateTime.SpecifyKind(value.Date.Add(clock), DateTimeKind.Local);
+        return local.ToUniversalTime();
+    }
+
+    private static string? FirstError<T>(ApiResponse<T> response)
+        => response.Errors is { Count: > 0 }
+            ? response.Errors.SelectMany(pair => pair.Value).FirstOrDefault()
+            : null;
+}
+
+<style>
+    .hint {
+        font-size: 12px;
+        color: #9b8085;
+    }
+
+    .advanced {
+        border: 1px solid #f0e4e6;
+        border-radius: 12px;
+    }
+</style>

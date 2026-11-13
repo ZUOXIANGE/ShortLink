@@ -1,0 +1,24 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <RootNamespace>ShortLink.UnitTests</RootNamespace>
+    <AssemblyName>ShortLink.UnitTests</AssemblyName>
+    <NoWarn>$(NoWarn);CA1707</NoWarn>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\ShortLink.Contracts\ShortLink.Contracts.csproj" />
+    <ProjectReference Include="..\..\src\ShortLink.Domain\ShortLink.Domain.csproj" />
+    <ProjectReference Include="..\..\src\ShortLink.Application\ShortLink.Application.csproj" />
+    <ProjectReference Include="..\..\src\ShortLink.Mcp\ShortLink.Mcp.csproj" />
+    <ProjectReference Include="..\..\src\ShortLink.Infrastructure\ShortLink.Infrastructure.csproj" />
+    <ProjectReference Include="..\..\src\ShortLink.Web\ShortLink.Web.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="xunit.v3" />
+    <PackageReference Include="Microsoft.Extensions.TimeProvider.Testing" />
+  </ItemGroup>
+
+</Project>

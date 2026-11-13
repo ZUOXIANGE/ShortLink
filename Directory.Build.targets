@@ -1,0 +1,14 @@
+<Project>
+
+  <!-- 测试项目统一约束：不参与打包、标记为测试项目 -->
+  <PropertyGroup Condition="$(MSBuildProjectDirectory.Replace('\','/').Contains('/tests/'))">
+    <IsPackable>false</IsPackable>
+    <IsTestProject>true</IsTestProject>
+  </PropertyGroup>
+
+  <!-- 迁移程序集只承载迁移代码，不参与打包 -->
+  <PropertyGroup Condition="$(MSBuildProjectName.Contains('.Migrations.'))">
+    <IsPackable>false</IsPackable>
+  </PropertyGroup>
+
+</Project>

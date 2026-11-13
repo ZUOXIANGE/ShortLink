@@ -1,0 +1,637 @@
+@page "/links"
+@attribute [Authorize]
+@inject ApiClient Api
+@inject IDialogService DialogService
+@inject ISnackbar Snackbar
+@inject IJSRuntime JS
+@inject NavigationManager Navigation
+@inject Permissions Perms
+@inject FileSaver Saver
+
+<div class="d-flex align-center justify-space-between mb-4 flex-wrap gap-2">
+    <div>
+        <h1 class="page-title">短链管理</h1>
+        <p class="page-subtitle">创建、启停、编辑、分流实验与数据导出</p>
+    </div>
+    <MudStack Row="true" Spacing="2">
+        <MudButton Variant="Variant.Outlined" Color="Color.Primary" StartIcon="@Icons.Material.Filled.FileDownload"
+                   OnClick="ExportAsync" Disabled="_exporting">
+            导出 CSV
+        </MudButton>
+        <MudButton Variant="Variant.Filled" Color="Color.Primary" StartIcon="@Icons.Material.Filled.Add"
+                   OnClick="CreateAsync" Disabled="@(!Perms.CanWrite)">
+            新建短链
+        </MudButton>
+    </MudStack>
+</div>
+
+<MudPaper Elevation="0" Class="pa-3 mb-3" Style="border:1px solid #F0E4E6;border-radius:14px;">
+    <MudStack Row="true" Spacing="3" AlignItems="AlignItems.Center" Class="flex-wrap">
+        <MudTextField @bind-Value="_keyword"
+                      Label="搜索短码 / 目标地址 / 标题"
+                      Variant="Variant.Outlined"
+                      Margin="Margin.Dense"
+                      Adornment="Adornment.Start"
+                      AdornmentIcon="@Icons.Material.Filled.Search"
+                      Immediate="true"
+                      OnKeyUp="OnKeywordKeyUp"
+                      Style="min-width:300px;" />
+
+        <MudSelect T="long?" Value="_domainId" Label="域名" Variant="Variant.Outlined" Margin="Margin.Dense" Style="width:190px;" ValueChanged="OnDomainChanged">
+            <MudSelectItem T="long?" Value="@((long?)null)">全部域名</MudSelectItem>
+            @foreach (var domain in _domains)
+            {
+                <MudSelectItem T="long?" Value="@((long?)domain.Id)">@domain.Host</MudSelectItem>
+            }
+        </MudSelect>
+
+        <MudSelect T="string" Value="_status" Label="状态" Variant="Variant.Outlined" Margin="Margin.Dense" Style="width:150px;" ValueChanged="OnStatusChanged">
+            <MudSelectItem T="string" Value="@((string?)null)">全部</MudSelectItem>
+            <MudSelectItem T="string" Value="@("enabled")">启用中</MudSelectItem>
+            <MudSelectItem T="string" Value="@("disabled")">已停用</MudSelectItem>
+            <MudSelectItem T="string" Value="@("expired")">已过期</MudSelectItem>
+            <MudSelectItem T="string" Value="@("capped")">已封顶</MudSelectItem>
+        </MudSelect>
+
+        <MudSwitch T="bool" Value="@_mineOnly" Color="Color.Primary" Label="只看我创建的"
+                   ValueChanged="OnMineChanged" Class="ml-2" />
+
+        <MudButton Variant="Variant.Outlined" Color="Color.Primary" StartIcon="@Icons.Material.Filled.Refresh" OnClick="ReloadAsync">
+            刷新
+        </MudButton>
+    </MudStack>
+</MudPaper>
+
+@if (_selectedIds.Count > 0)
+{
+    <MudPaper Elevation="0" Class="batch-bar pa-2 mb-3">
+        <MudStack Row="true" Spacing="2" AlignItems="AlignItems.Center" Class="flex-wrap">
+            <MudChip T="string" Size="Size.Small" Color="Color.Primary">已选 @_selectedIds.Count 条</MudChip>
+            <MudButton Size="Size.Small" Variant="Variant.Text" Color="Color.Primary" OnClick="SelectAllOnPage">
+                全选本页
+            </MudButton>
+            <MudButton Size="Size.Small" Variant="Variant.Text" OnClick="ClearSelection">清空</MudButton>
+            <MudSpacer />
+            <MudButton Size="Size.Small" Variant="Variant.Outlined" Color="Color.Success"
+                       Disabled="@(!Perms.CanWrite)" OnClick="@(() => BatchAsync(BatchActions.Enable))">批量启用</MudButton>
+            <MudButton Size="Size.Small" Variant="Variant.Outlined" Color="Color.Warning"
+                       Disabled="@(!Perms.CanWrite)" OnClick="@(() => BatchAsync(BatchActions.Disable))">批量停用</MudButton>
+            <MudButton Size="Size.Small" Variant="Variant.Outlined"
+                       Disabled="@(!Perms.CanWrite)" OnClick="@(() => BatchAsync(BatchActions.ChangeDomain))">换域名</MudButton>
+            <MudButton Size="Size.Small" Variant="Variant.Outlined"
+                       Disabled="@(!Perms.CanWrite)" OnClick="@(() => BatchAsync(BatchActions.ChangeExpiry))">改时间窗</MudButton>
+            <MudButton Size="Size.Small" Variant="Variant.Outlined" Color="Color.Error"
+                       Disabled="@(!Perms.CanWrite)" OnClick="@(() => BatchAsync(BatchActions.Delete))">批量删除</MudButton>
+        </MudStack>
+    </MudPaper>
+}
+
+<MudTable @ref="_table"
+          T="LinkDto"
+          ServerData="LoadServerData"
+          Dense="true"
+          Hover="true"
+          Breakpoint="Breakpoint.Sm"
+          Elevation="0"
+          Style="border:1px solid #F0E4E6;border-radius:14px;overflow:hidden;">
+    <HeaderContent>
+        <MudTh Style="width:44px;">
+            <MudCheckBox T="bool" Value="@AllOnPageSelected" ValueChanged="@((bool v) => OnHeaderCheckBox(v))"
+                         Dense="true" Color="Color.Primary" Disabled="@(_pageItems.Count == 0)" />
+        </MudTh>
+        <MudTh><MudTableSortLabel T="LinkDto" SortLabel="created">短链接</MudTableSortLabel></MudTh>
+        <MudTh>目标地址</MudTh>
+        <MudTh Style="text-align:right;">点击</MudTh>
+        <MudTh>状态</MudTh>
+        <MudTh>操作</MudTh>
+    </HeaderContent>
+    <RowTemplate>
+        <MudTd>
+            <MudCheckBox T="bool" Value="@IsSelected(context.Id)" ValueChanged="@((bool v) => ToggleSelect(context.Id, v))"
+                         Dense="true" Color="Color.Primary" />
+        </MudTd>
+        <MudTd DataLabel="短链接">
+            <div class="d-flex align-center">
+                <MudIconButton Icon="@Icons.Material.Filled.ContentCopy"
+                               Size="Size.Small"
+                               Color="Color.Default"
+                               OnClick="@(() => CopyAsync(context.ShortUrl))" />
+                <div>
+                    <div class="mono short-url">@context.ShortUrl</div>
+                    <div class="meta">
+                        @(context.Title ?? "未命名") · @context.CreatedAtUtc.ToLocalTime().ToString("yyyy-MM-dd")
+                        @if (!string.IsNullOrWhiteSpace(context.CreatedByName))
+                        {
+                            <span> · @context.CreatedByName</span>
+                        }
+                    </div>
+                </div>
+            </div>
+        </MudTd>
+        <MudTd DataLabel="目标地址">
+            <span class="mono truncate" title="@context.TargetUrl">@context.TargetUrl</span>
+            <div class="chips">
+                @if (context.HasPassword)
+                {
+                    <MudChip T="string" Size="Size.Small" Color="Color.Warning">密码</MudChip>
+                }
+                @if (context.RouteCount > 0)
+                {
+                    <MudChip T="string" Size="Size.Small" Color="Color.Primary">路由 @context.RouteCount</MudChip>
+                }
+                @if (!string.IsNullOrWhiteSpace(context.IpAllowList))
+                {
+                    <MudChip T="string" Size="Size.Small" Color="Color.Info">IP 白名单</MudChip>
+                }
+                @if (!string.IsNullOrWhiteSpace(context.IpBlockList))
+                {
+                    <MudChip T="string" Size="Size.Small" Color="Color.Default">IP 黑名单</MudChip>
+                }
+                @if (context.AntiBlockEnabled)
+                {
+                    <MudChip T="string" Size="Size.Small" Color="Color.Secondary">防红</MudChip>
+                }
+                @if (context.BotPolicy == BotPolicies.Block)
+                {
+                    <MudChip T="string" Size="Size.Small" Color="Color.Error">拦机器人</MudChip>
+                }
+                else if (context.BotPolicy == BotPolicies.IgnoreCount)
+                {
+                    <MudChip T="string" Size="Size.Small" Color="Color.Default">机器人不计</MudChip>
+                }
+                @if (context.HasConversionSecret)
+                {
+                    <MudChip T="string" Size="Size.Small" Color="Color.Success">转化</MudChip>
+                }
+            </div>
+        </MudTd>
+        <MudTd DataLabel="点击" Style="text-align:right;font-weight:600;color:#8c0619;">
+            @context.ClickCount
+            @if (context.MaxClicks is { } maxClicks)
+            {
+                <div class="meta">封顶 @maxClicks</div>
+            }
+        </MudTd>
+        <MudTd DataLabel="状态">
+            @if (IsCapped(context))
+            {
+                <MudChip T="string" Size="Size.Small" Color="Color.Error">已封顶</MudChip>
+            }
+            else if (IsExpired(context))
+            {
+                <MudChip T="string" Size="Size.Small" Color="Color.Warning">已过期</MudChip>
+            }
+            else if (IsNotStarted(context))
+            {
+                <MudChip T="string" Size="Size.Small" Color="Color.Info">未生效</MudChip>
+            }
+            else if (context.Status == "enabled")
+            {
+                <MudChip T="string" Size="Size.Small" Color="Color.Success">启用中</MudChip>
+            }
+            else
+            {
+                <MudChip T="string" Size="Size.Small" Color="Color.Default">已停用</MudChip>
+            }
+            @if (context.StartsAtUtc is { } startsAt)
+            {
+                <div class="meta">起 @startsAt.ToLocalTime().ToString("MM-dd HH:mm")</div>
+            }
+            @if (context.ExpiresAtUtc is { } expiresAt)
+            {
+                <div class="meta">至 @expiresAt.ToLocalTime().ToString("MM-dd HH:mm")</div>
+            }
+        </MudTd>
+        <MudTd DataLabel="操作">
+            <MudMenu Icon="@Icons.Material.Filled.MoreVert" Size="Size.Small" Dense="true">
+                <MudMenuItem OnClick="@(() => NavigateToStats(context.Id))">访问统计</MudMenuItem>
+                <MudMenuItem OnClick="@(() => ShowQrAsync(context))">二维码</MudMenuItem>
+                <MudMenuItem Disabled="@(!Perms.CanModify(context))" OnClick="@(() => EditAsync(context))">编辑</MudMenuItem>
+                <MudMenuItem Disabled="@(!Perms.CanModify(context))" OnClick="@(() => EditRoutesAsync(context))">条件路由</MudMenuItem>
+                <MudMenuItem Disabled="@(!Perms.CanModify(context))" OnClick="@(() => ShowConversionKeyAsync(context))">转化回调</MudMenuItem>
+                @if (CanToggle(context))
+                {
+                    <MudMenuItem OnClick="@(() => ToggleAsync(context))">
+                        @(context.Status == "enabled" ? "停用" : "启用")
+                    </MudMenuItem>
+                }
+                <MudMenuItem Disabled="@(!Perms.CanModify(context))" OnClick="@(() => DeleteAsync(context))">删除</MudMenuItem>
+            </MudMenu>
+        </MudTd>
+    </RowTemplate>
+    <PagerContent>
+        <MudTablePager PageSizeOptions="new[] { 20, 50, 100 }" RowsPerPageString="每页行数" InfoFormat="{first_item}-{last_item} / {all_items}" />
+    </PagerContent>
+</MudTable>
+
+@code {
+    private MudTable<LinkDto>? _table;
+    private IReadOnlyList<DomainDto> _domains = [];
+    private IReadOnlyList<LinkDto> _pageItems = [];
+    private readonly HashSet<long> _selectedIds = [];
+    private string? _keyword;
+    private long? _domainId;
+    private string? _status;
+    private bool _mineOnly;
+    private bool _exporting;
+    private CancellationTokenSource? _loadCancellation;
+    private long _loadVersion;
+    private int _totalItems;
+
+    protected override async Task OnInitializedAsync()
+    {
+        var response = await Api.GetDomainsAsync();
+        if (response.Code == BizCodes.Success && response.Data is not null)
+        {
+            _domains = response.Data;
+        }
+    }
+
+    private bool AllOnPageSelected => _pageItems.Count > 0 && _pageItems.All(l => _selectedIds.Contains(l.Id));
+
+    private bool IsSelected(long id) => _selectedIds.Contains(id);
+
+    private void ToggleSelect(long id, bool selected)
+    {
+        if (selected)
+        {
+            _selectedIds.Add(id);
+        }
+        else
+        {
+            _selectedIds.Remove(id);
+        }
+    }
+
+    private void OnHeaderCheckBox(bool value)
+    {
+        foreach (var link in _pageItems)
+        {
+            if (value)
+            {
+                _selectedIds.Add(link.Id);
+            }
+            else
+            {
+                _selectedIds.Remove(link.Id);
+            }
+        }
+    }
+
+    private async Task SelectAllOnPage()
+    {
+        foreach (var link in _pageItems)
+        {
+            _selectedIds.Add(link.Id);
+        }
+
+        await Task.CompletedTask;
+    }
+
+    private void ClearSelection() => _selectedIds.Clear();
+
+    private LinkQuery BuildQuery(int page, int pageSize, string? sort) => new()
+    {
+        Page = page,
+        PageSize = pageSize,
+        Keyword = _keyword,
+        DomainId = _domainId,
+        Status = _status,
+        Sort = sort,
+        Mine = _mineOnly ? true : null,
+    };
+
+    private async Task<TableData<LinkDto>> LoadServerData(TableState state, CancellationToken cancellationToken)
+    {
+        var sort = state.SortLabel switch
+        {
+            "created" => state.SortDirection == SortDirection.Ascending ? "created_asc" : "created_desc",
+            _ => "created_desc",
+        };
+
+        _loadCancellation?.Cancel();
+        _loadCancellation?.Dispose();
+        var loadCancellation = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+        _loadCancellation = loadCancellation;
+        var version = ++_loadVersion;
+
+        try
+        {
+            var response = await Api.QueryLinksAsync(
+                BuildQuery(state.Page + 1, state.PageSize, sort),
+                loadCancellation.Token);
+            if (version != _loadVersion || loadCancellation.IsCancellationRequested)
+            {
+                return CurrentTableData();
+            }
+
+            if (response.Code != BizCodes.Success || response.Data is null)
+            {
+                Api.NotifyIfFailed(response);
+                _pageItems = [];
+                _totalItems = 0;
+                return new TableData<LinkDto> { Items = [], TotalItems = 0 };
+            }
+
+            _pageItems = response.Data.Items;
+            _totalItems = (int)response.Data.Total;
+            return CurrentTableData();
+        }
+        catch (OperationCanceledException) when (loadCancellation.IsCancellationRequested)
+        {
+            return CurrentTableData();
+        }
+        finally
+        {
+            if (ReferenceEquals(_loadCancellation, loadCancellation))
+            {
+                _loadCancellation = null;
+            }
+
+            loadCancellation.Dispose();
+        }
+    }
+
+    private TableData<LinkDto> CurrentTableData() => new()
+    {
+        Items = _pageItems,
+        TotalItems = _totalItems,
+    };
+
+    private async Task OnKeywordKeyUp(KeyboardEventArgs args)
+    {
+        if (args.Key == "Enter")
+        {
+            await ReloadFirstPageAsync();
+        }
+    }
+
+    private async Task OnDomainChanged(long? domainId)
+    {
+        _domainId = domainId;
+        await ReloadFirstPageAsync();
+    }
+
+    private async Task OnStatusChanged(string? status)
+    {
+        _status = status;
+        await ReloadFirstPageAsync();
+    }
+
+    private async Task OnMineChanged(bool mine)
+    {
+        _mineOnly = mine;
+        await ReloadFirstPageAsync();
+    }
+
+    private async Task ReloadAsync()
+    {
+        if (_table is not null)
+        {
+            await _table.ReloadServerData();
+        }
+    }
+
+    private async Task ReloadFirstPageAsync()
+    {
+        if (_table is not null)
+        {
+            _table.NavigateTo(0);
+            await _table.ReloadServerData();
+        }
+    }
+
+    private async Task ExportAsync()
+    {
+        _exporting = true;
+        try
+        {
+            // 导出跟随当前筛选条件，但不受分页限制（服务端上限 10 万行）。
+            var result = await Api.ExportLinksAsync(BuildQuery(1, 200, "created_desc"));
+            if (!result.Success || result.Bytes is null)
+            {
+                Snackbar.Add(result.Error ?? "导出失败", Severity.Error);
+                return;
+            }
+
+            var saved = await Saver.SaveAsync(result.FileName ?? "links.csv", "text/csv;charset=utf-8", result.Bytes);
+            if (saved)
+            {
+                if (result.Truncated)
+                {
+                    Snackbar.Add("结果超过 100000 条，本次仅导出前 100000 条；请缩小筛选范围", Severity.Warning);
+                }
+                else
+                {
+                    Snackbar.Add($"已导出 {result.Bytes.Length / 1024.0:0.#} KB", Severity.Success);
+                }
+            }
+            else
+            {
+                Snackbar.Add("浏览器拒绝了下载，请检查下载权限", Severity.Warning);
+            }
+        }
+        finally
+        {
+            _exporting = false;
+        }
+    }
+
+    private async Task CreateAsync()
+    {
+        var parameters = new DialogParameters<LinkEditDialog>
+        {
+            { x => x.Domains, _domains },
+        };
+
+        var dialog = await DialogService.ShowAsync<LinkEditDialog>("新建短链", parameters,
+            new DialogOptions { MaxWidth = MaxWidth.Medium, FullWidth = true });
+
+        var result = await dialog.Result;
+        if (result is { Canceled: false })
+        {
+            await ReloadAsync();
+        }
+    }
+
+    private async Task EditAsync(LinkDto link)
+    {
+        var parameters = new DialogParameters<LinkEditDialog>
+        {
+            { x => x.Domains, _domains },
+            { x => x.Link, link },
+        };
+
+        var dialog = await DialogService.ShowAsync<LinkEditDialog>("编辑短链", parameters,
+            new DialogOptions { MaxWidth = MaxWidth.Medium, FullWidth = true });
+
+        var result = await dialog.Result;
+        if (result is { Canceled: false })
+        {
+            await ReloadAsync();
+        }
+    }
+
+    private async Task EditRoutesAsync(LinkDto link)
+    {
+        var parameters = new DialogParameters<RouteEditorDialog>
+        {
+            { x => x.Link, link },
+        };
+
+        var dialog = await DialogService.ShowAsync<RouteEditorDialog>("条件路由", parameters,
+            new DialogOptions { MaxWidth = MaxWidth.Large, FullWidth = true });
+
+        var result = await dialog.Result;
+        if (result is { Canceled: false })
+        {
+            await ReloadAsync();
+        }
+    }
+
+    private async Task ShowQrAsync(LinkDto link)
+    {
+        var parameters = new DialogParameters<QrDialog>
+        {
+            { x => x.Url, link.ShortUrl },
+            { x => x.Code, link.Code },
+        };
+
+        await DialogService.ShowAsync<QrDialog>("二维码", parameters,
+            new DialogOptions { MaxWidth = MaxWidth.ExtraSmall, FullWidth = true });
+    }
+
+    private async Task ShowConversionKeyAsync(LinkDto link)
+    {
+        var parameters = new DialogParameters<ConversionKeyDialog>
+        {
+            { x => x.LinkId, link.Id },
+        };
+
+        await DialogService.ShowAsync<ConversionKeyDialog>("转化回调", parameters,
+            new DialogOptions { MaxWidth = MaxWidth.Medium, FullWidth = true });
+    }
+
+    private async Task BatchAsync(string action)
+    {
+        if (_selectedIds.Count == 0)
+        {
+            return;
+        }
+
+        var parameters = new DialogParameters<BatchOperationDialog>
+        {
+            { x => x.Action, action },
+            { x => x.Ids, _selectedIds.ToList() },
+            { x => x.Domains, _domains },
+        };
+
+        var dialog = await DialogService.ShowAsync<BatchOperationDialog>("批量操作", parameters,
+            new DialogOptions { MaxWidth = MaxWidth.Small, FullWidth = true });
+
+        var result = await dialog.Result;
+        if (result is { Canceled: false })
+        {
+            _selectedIds.Clear();
+            await ReloadAsync();
+        }
+    }
+
+    private async Task ToggleAsync(LinkDto link)
+    {
+        var response = await Api.ToggleLinkAsync(link.Id);
+        if (response.Code == BizCodes.Success)
+        {
+            Snackbar.Add(link.Status == "enabled" ? "已停用" : "已启用", Severity.Success);
+            await ReloadAsync();
+            return;
+        }
+
+        Api.NotifyIfFailed(response);
+    }
+
+    private async Task DeleteAsync(LinkDto link)
+    {
+        var confirmed = await DialogService.ShowMessageBoxAsync(
+            "删除短链",
+            $"确定删除 /{link.Code} 吗？删除后该短链立即失效，访问记录不再展示。",
+            yesText: "删除",
+            cancelText: "取消");
+
+        if (confirmed != true)
+        {
+            return;
+        }
+
+        var response = await Api.DeleteLinkAsync(link.Id);
+        if (response.Code == BizCodes.Success)
+        {
+            _selectedIds.Remove(link.Id);
+            Snackbar.Add("已删除", Severity.Success);
+            await ReloadAsync();
+            return;
+        }
+
+        Api.NotifyIfFailed(response);
+    }
+
+    private async Task CopyAsync(string url)
+    {
+        try
+        {
+            await JS.InvokeVoidAsync("navigator.clipboard.writeText", url);
+            Snackbar.Add("已复制到剪贴板", Severity.Success);
+        }
+        catch (JSException)
+        {
+            Snackbar.Add($"复制失败，请手动复制：{url}", Severity.Warning);
+        }
+    }
+
+    private void NavigateToStats(long id) => Navigation.NavigateTo($"/links/{id}/stats");
+
+    private static bool IsExpired(LinkDto link)
+        => link.ExpiresAtUtc is { } expiresAt && expiresAt <= DateTime.UtcNow;
+
+    private static bool IsNotStarted(LinkDto link)
+        => link.StartsAtUtc is { } startsAt && startsAt > DateTime.UtcNow;
+
+    private static bool IsCapped(LinkDto link)
+        => link.MaxClicks is { } maxClicks && link.ClickCount >= maxClicks;
+
+    private bool CanToggle(LinkDto link)
+        => Perms.CanModify(link)
+           && (link.Status == "enabled" || (!IsExpired(link) && !IsCapped(link)));
+}
+
+<style>
+    .batch-bar {
+        border: 1px solid #e9c8ce;
+        border-radius: 14px;
+        background: #fffafb;
+    }
+
+    .short-url {
+        font-weight: 600;
+        color: #8c0619;
+        font-size: 13px;
+    }
+
+    .meta {
+        font-size: 11px;
+        color: #9b8085;
+        margin-top: 2px;
+    }
+
+    .chips {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 4px;
+        margin-top: 4px;
+    }
+
+    .chips .mud-chip {
+        height: 20px;
+        font-size: 11px;
+    }
+</style>

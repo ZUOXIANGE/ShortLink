@@ -1,0 +1,27 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <RootNamespace>ShortLink.Mcp</RootNamespace>
+    <AssemblyName>ShortLink.Mcp</AssemblyName>
+    <Description>MCP 入口适配层：把短链与统计能力暴露为 AI 可调用工具（Streamable HTTP 传输，复用 JWT 认证）。</Description>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <!--
+      依赖方向：Mcp → Application → Domain，以及 Contracts（与 Web 共享的 DTO）。
+      刻意不引用 ShortLink.Infrastructure：工具层不得直接碰 DbContext，
+      必须走 Application 用例，这条由 ArchUnitNET 守护。
+    -->
+    <ProjectReference Include="..\ShortLink.Contracts\ShortLink.Contracts.csproj" />
+    <ProjectReference Include="..\ShortLink.Application\ShortLink.Application.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="ModelContextProtocol.AspNetCore" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <InternalsVisibleTo Include="ShortLink.IntegrationTests" />
+  </ItemGroup>
+
+</Project>

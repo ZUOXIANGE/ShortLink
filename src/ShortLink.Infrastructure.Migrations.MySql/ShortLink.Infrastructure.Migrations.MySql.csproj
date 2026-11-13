@@ -1,0 +1,20 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <RootNamespace>ShortLink.Infrastructure.Migrations.MySql</RootNamespace>
+    <AssemblyName>ShortLink.Infrastructure.Migrations.MySql</AssemblyName>
+    <Description>MySQL 专属迁移程序集（驱动为 Oracle MySql.EntityFrameworkCore，许可证需评估）。</Description>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\ShortLink.Infrastructure\ShortLink.Infrastructure.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.EntityFrameworkCore.Design">
+      <PrivateAssets>all</PrivateAssets>
+      <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+    </PackageReference>
+  </ItemGroup>
+
+</Project>

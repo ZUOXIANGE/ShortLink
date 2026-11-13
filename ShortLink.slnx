@@ -1,0 +1,23 @@
+<Solution>
+
+  <Folder Name="/src/">
+    <Project Path="src/ShortLink.Contracts/ShortLink.Contracts.csproj" />
+    <Project Path="src/ShortLink.Domain/ShortLink.Domain.csproj" />
+    <Project Path="src/ShortLink.Application/ShortLink.Application.csproj" />
+    <Project Path="src/ShortLink.Infrastructure/ShortLink.Infrastructure.csproj" />
+    <Project Path="src/ShortLink.Infrastructure.Migrations.Sqlite/ShortLink.Infrastructure.Migrations.Sqlite.csproj" />
+    <Project Path="src/ShortLink.Infrastructure.Migrations.PostgreSql/ShortLink.Infrastructure.Migrations.PostgreSql.csproj" />
+    <Project Path="src/ShortLink.Infrastructure.Migrations.MySql/ShortLink.Infrastructure.Migrations.MySql.csproj" />
+    <Project Path="src/ShortLink.Mcp/ShortLink.Mcp.csproj" />
+    <Project Path="src/ShortLink.Api/ShortLink.Api.csproj" />
+    <Project Path="src/ShortLink.Web/ShortLink.Web.csproj" />
+    <Project Path="src/ShortLink.AppHost/ShortLink.AppHost.csproj" />
+  </Folder>
+
+  <Folder Name="/tests/">
+    <Project Path="tests/ShortLink.UnitTests/ShortLink.UnitTests.csproj" />
+    <Project Path="tests/ShortLink.IntegrationTests/ShortLink.IntegrationTests.csproj" />
+    <Project Path="tests/ShortLink.ArchitectureTests/ShortLink.ArchitectureTests.csproj" />
+  </Folder>
+
+</Solution>

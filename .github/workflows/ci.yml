@@ -1,0 +1,55 @@
+name: CI
+
+on:
+  push:
+    branches: [main, master]
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+env:
+  DOTNET_NOLOGO: "true"
+  DOTNET_CLI_TELEMETRY_OPTOUT: "true"
+  DOTNET_SKIP_FIRST_TIME_EXPERIENCE: "true"
+  # 架构测试读取 Debug 产物，不能改成 Release。
+  CONFIGURATION: Debug
+
+jobs:
+  build-and-test:
+    name: Build & Test
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          # 以仓库 global.json 为准（SDK 10.0.402，rollForward=latestFeature）。
+          global-json-file: global.json
+
+      - name: Cache NuGet packages
+        uses: actions/cache@v4
+        with:
+          path: ~/.nuget/packages
+          key: nuget-${{ runner.os }}-${{ hashFiles('Directory.Packages.props', '**/*.csproj') }}
+          restore-keys: |
+            nuget-${{ runner.os }}-
+
+      - name: Restore
+        run: dotnet restore ShortLink.slnx
+
+      - name: Build
+        run: dotnet build ShortLink.slnx -c ${{ env.CONFIGURATION }} --no-restore -p:ContinuousIntegrationBuild=true
+
+      # 默认只跑 SQLite 宿主（秒级）；容器化用例需要 SHORTLINK_TEST_CONTAINERS=1，不在 CI 默认路径开启。
+      - name: Test
+        run: dotnet test ShortLink.slnx -c ${{ env.CONFIGURATION }} --no-restore

@@ -1,0 +1,2 @@
+# Git 钩子由 sh 解析，检出时必须保持 LF；Windows 的 CRLF 会让钩子启动失败。
+.husky/** text eol=lf

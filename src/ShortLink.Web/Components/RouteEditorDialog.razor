@@ -1,0 +1,539 @@
+@inject ApiClient Api
+@inject ISnackbar Snackbar
+@inject Permissions Perms
+
+<MudDialog>
+    <TitleContent>
+        <MudStack Row="true" Spacing="2" AlignItems="AlignItems.Center">
+            <MudIcon Icon="@Icons.Material.Filled.AltRoute" Color="Color.Primary" />
+            <div>
+                <MudText Typo="Typo.h6">条件路由 / A/B 实验</MudText>
+                <MudText Typo="Typo.caption" Class="hint mono">@Link.ShortUrl</MudText>
+            </div>
+        </MudStack>
+    </TitleContent>
+
+    <DialogContent>
+        <MudTabs Elevation="0" Rounded="true" ApplyEffectsToContainer="true" TabPanelsClass="pa-0 pt-4">
+            <MudTabPanel Text="规则">
+                <MudAlert Severity="Severity.Info" Dense="true" Class="mb-4">
+                    按优先级从高到低匹配：优先级相同的一组内，命中多条时按权重分流，同一访客始终落到同一分支。
+                    全部未命中时走兜底地址（@FallbackHint）。
+                </MudAlert>
+
+                @if (_routes.Count == 0)
+                {
+                    <MudPaper Elevation="0" Class="empty pa-6 mb-4">
+                        <MudText Typo="Typo.body2">还没有任何分支，所有访问都会直接跳到 @FallbackHint。</MudText>
+                    </MudPaper>
+                }
+
+                @for (var index = 0; index < _routes.Count; index++)
+                {
+                    var position = index;
+                    var route = _routes[index];
+                    <MudPaper Elevation="0" Class="route-card pa-4 mb-3">
+                        <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="2" Class="mb-3 flex-wrap">
+                            <MudChip T="string" Size="Size.Small" Color="Color.Primary">#@(position + 1)</MudChip>
+                            <MudText Typo="Typo.subtitle2">@(string.IsNullOrWhiteSpace(route.Name) ? "未命名分支" : route.Name)</MudText>
+                            <MudSpacer />
+                            <MudText Typo="Typo.caption" Class="hint">已点击 @route.ClickCount 次</MudText>
+                            <MudIconButton Icon="@Icons.Material.Filled.DeleteOutline" Size="Size.Small"
+                                           Color="Color.Error" Disabled="@(!CanEdit)"
+                                           OnClick="@(() => RemoveRoute(position))" />
+                        </MudStack>
+
+                        <MudGrid Spacing="2">
+                            <MudItem xs="12" sm="6">
+                                <MudTextField @bind-Value="route.Name" Label="分支名称" Variant="Variant.Outlined"
+                                              Margin="Margin.Dense" Immediate="true" Disabled="@(!CanEdit)" />
+                            </MudItem>
+                            <MudItem xs="12" sm="6">
+                                <MudTextField @bind-Value="route.TargetUrl" Label="分支目标地址" Variant="Variant.Outlined"
+                                              Margin="Margin.Dense" Immediate="true" Disabled="@(!CanEdit)" />
+                            </MudItem>
+                            <MudItem xs="6" sm="3">
+                                <MudNumericField T="int" @bind-Value="route.Priority" Label="优先级"
+                                                 HelperText="-100 ~ 100，越大越优先" Variant="Variant.Outlined"
+                                                 Margin="Margin.Dense" Min="-100" Max="100" Disabled="@(!CanEdit)" />
+                            </MudItem>
+                            <MudItem xs="6" sm="3">
+                                <MudNumericField T="int" @bind-Value="route.Weight" Label="权重"
+                                                 HelperText="同优先级内按比例分流" Variant="Variant.Outlined"
+                                                 Margin="Margin.Dense" Min="0" Max="1000" Disabled="@(!CanEdit)" />
+                            </MudItem>
+                            <MudItem xs="6" sm="3">
+                                <MudSelect T="string" @bind-Value="route.Match" Label="条件组合" Variant="Variant.Outlined"
+                                           Margin="Margin.Dense" Disabled="@(!CanEdit)">
+                                    <MudSelectItem T="string" Value="@("all")">全部满足（AND）</MudSelectItem>
+                                    <MudSelectItem T="string" Value="@("any")">任一满足（OR）</MudSelectItem>
+                                </MudSelect>
+                            </MudItem>
+                            <MudItem xs="6" sm="3">
+                                <MudSwitch @bind-Value="route.IsEnabled" Color="Color.Primary" Label="启用"
+                                           Disabled="@(!CanEdit)" Class="mt-3" />
+                            </MudItem>
+                        </MudGrid>
+
+                        <MudDivider Class="my-3" />
+
+                        <MudStack Row="true" AlignItems="AlignItems.Center" Class="mb-2">
+                            <MudText Typo="Typo.caption" Class="hint">匹配条件（留空表示无条件命中，只用于分流）</MudText>
+                            <MudSpacer />
+                            <MudButton Size="Size.Small" Variant="Variant.Text" Color="Color.Primary"
+                                       StartIcon="@Icons.Material.Filled.Add" Disabled="@(!CanEdit)"
+                                       OnClick="@(() => route.Conditions.Add(new ConditionDraft()))">
+                                添加条件
+                            </MudButton>
+                        </MudStack>
+
+                        @if (route.Conditions.Count == 0)
+                        {
+                            <MudText Typo="Typo.caption" Class="hint">无条件：任意访客都会命中该分支。</MudText>
+                        }
+
+                        @for (var ci = 0; ci < route.Conditions.Count; ci++)
+                        {
+                            var conditionIndex = ci;
+                            var condition = route.Conditions[ci];
+                            <MudGrid Spacing="2" Class="mb-1">
+                                <MudItem xs="5" sm="3">
+                                    <MudSelect T="string" @bind-Value="condition.Field" Label="字段"
+                                               Variant="Variant.Outlined" Margin="Margin.Dense"
+                                               Dense="true" Disabled="@(!CanEdit)">
+                                        @foreach (var field in RouteFieldOptions)
+                                        {
+                                            <MudSelectItem T="string" Value="@field.Value">@field.Label</MudSelectItem>
+                                        }
+                                    </MudSelect>
+                                </MudItem>
+                                <MudItem xs="4" sm="3">
+                                    <MudSelect T="string" @bind-Value="condition.Op" Label="运算符"
+                                               Variant="Variant.Outlined" Margin="Margin.Dense"
+                                               Dense="true" Disabled="@(!CanEdit)">
+                                        @foreach (var op in RouteOperatorOptions)
+                                        {
+                                            <MudSelectItem T="string" Value="@op.Value">@op.Label</MudSelectItem>
+                                        }
+                                    </MudSelect>
+                                </MudItem>
+                                <MudItem xs="12" sm="5">
+                                    <MudTextField @bind-Value="condition.Value"
+                                                  Label="@ValueLabel(condition.Field, condition.Op)"
+                                                  Variant="Variant.Outlined" Margin="Margin.Dense" Immediate="true"
+                                                  Disabled="@(!CanEdit)" />
+                                </MudItem>
+                                <MudItem xs="3" sm="1" Class="d-flex align-center">
+                                    <MudIconButton Icon="@Icons.Material.Filled.Close" Size="Size.Small"
+                                                   Color="Color.Default" Disabled="@(!CanEdit)"
+                                                   OnClick="@(() => route.Conditions.RemoveAt(conditionIndex))" />
+                                </MudItem>
+                            </MudGrid>
+                        }
+                    </MudPaper>
+                }
+
+                <MudButton Variant="Variant.Outlined" Color="Color.Primary" StartIcon="@Icons.Material.Filled.Add"
+                           Disabled="@(!CanEdit || _routes.Count >= SaveLinkRoutesRequest.MaxRoutes)" OnClick="AddRoute" Class="mt-2">
+                    添加分支（@_routes.Count / @SaveLinkRoutesRequest.MaxRoutes）
+                </MudButton>
+
+                @if (!string.IsNullOrEmpty(_error))
+                {
+                    <MudAlert Severity="Severity.Error" Dense="true" Class="mt-4">@_error</MudAlert>
+                }
+            </MudTabPanel>
+
+            <MudTabPanel Text="试算">
+                <MudAlert Severity="Severity.Warning" Dense="true" Class="mb-4">
+                    试算基于<strong>已保存</strong>的规则；改完规则请先保存再试算。
+                </MudAlert>
+
+                <MudGrid Spacing="2">
+                    <MudItem xs="6" sm="3">
+                        <MudTextField @bind-Value="_test.Country" Label="国家码" Placeholder="CN"
+                                      Variant="Variant.Outlined" Margin="Margin.Dense" Immediate="true" />
+                    </MudItem>
+                    <MudItem xs="6" sm="3">
+                        <MudTextField @bind-Value="_test.Province" Label="省份" Placeholder="广东"
+                                      Variant="Variant.Outlined" Margin="Margin.Dense" Immediate="true" />
+                    </MudItem>
+                    <MudItem xs="6" sm="3">
+                        <MudTextField @bind-Value="_test.Device" Label="设备" Placeholder="mobile"
+                                      Variant="Variant.Outlined" Margin="Margin.Dense" Immediate="true" />
+                    </MudItem>
+                    <MudItem xs="6" sm="3">
+                        <MudTextField @bind-Value="_test.Browser" Label="浏览器" Placeholder="WeChat"
+                                      Variant="Variant.Outlined" Margin="Margin.Dense" Immediate="true" />
+                    </MudItem>
+                    <MudItem xs="6" sm="3">
+                        <MudTextField @bind-Value="_test.Os" Label="操作系统" Placeholder="iOS"
+                                      Variant="Variant.Outlined" Margin="Margin.Dense" Immediate="true" />
+                    </MudItem>
+                    <MudItem xs="6" sm="3">
+                        <MudTextField @bind-Value="_test.Language" Label="语言" Placeholder="zh-CN"
+                                      Variant="Variant.Outlined" Margin="Margin.Dense" Immediate="true" />
+                    </MudItem>
+                    <MudItem xs="12" sm="6">
+                        <MudTextField @bind-Value="_test.Referer" Label="来源页 Referer"
+                                      Variant="Variant.Outlined" Margin="Margin.Dense" Immediate="true" />
+                    </MudItem>
+                    <MudItem xs="12" sm="6">
+                        <MudTextField @bind-Value="_testQuery" Label="查询参数"
+                                      HelperText="形如 utm_source=wechat&from=home" Variant="Variant.Outlined"
+                                      Margin="Margin.Dense" Immediate="true" />
+                    </MudItem>
+                    <MudItem xs="6" sm="3">
+                        <MudNumericField T="int" @bind-Value="_test.Repeat" Label="模拟访客数"
+                                         Variant="Variant.Outlined" Margin="Margin.Dense" Min="1" Max="10000" />
+                    </MudItem>
+                </MudGrid>
+
+                <MudButton Variant="Variant.Filled" Color="Color.Primary" Class="mt-3"
+                           StartIcon="@Icons.Material.Filled.Science" OnClick="RunTestAsync" Disabled="_testing">
+                    开始试算
+                </MudButton>
+
+                @if (_testResult is not null)
+                {
+                    <MudPaper Elevation="0" Class="result pa-4 mt-4">
+                        <MudText Typo="Typo.subtitle2" Class="mb-2">单次命中结果</MudText>
+                        <MudSimpleTable Dense="true" Elevation="0">
+                            <tbody>
+                                <tr>
+                                    <th style="width:120px;">命中分支</th>
+                                    <td>@(_testResult.RouteName ?? "兜底地址")</td>
+                                </tr>
+                                <tr>
+                                    <th>目标地址</th>
+                                    <td class="mono truncate" title="@_testResult.TargetUrl">@_testResult.TargetUrl</td>
+                                </tr>
+                                <tr>
+                                    <th>兜底地址</th>
+                                    <td class="mono truncate" title="@_testResult.FallbackUrl">@_testResult.FallbackUrl</td>
+                                </tr>
+                                <tr>
+                                    <th>实验分流</th>
+                                    <td>@(_testResult.IsExperimental ? "是（同优先级多分支）" : "否")</td>
+                                </tr>
+                            </tbody>
+                        </MudSimpleTable>
+
+                        <MudText Typo="Typo.subtitle2" Class="mt-4 mb-2">@_test.Repeat 位访客的分流占比</MudText>
+                        @foreach (var bucket in _testResult.Distribution)
+                        {
+                            <div class="bucket">
+                                <div class="bucket-head">
+                                    <span>@bucket.Name</span>
+                                    <span class="mono">@bucket.Hits · @bucket.Percent%</span>
+                                </div>
+                                    <div class="bucket-bar">
+                                        <span style="@BarWidth(bucket.Percent)"></span>
+                                    </div>
+                            </div>
+                        }
+                    </MudPaper>
+                }
+            </MudTabPanel>
+        </MudTabs>
+    </DialogContent>
+
+    <DialogActions>
+        <MudButton OnClick="Close">关闭</MudButton>
+        <MudButton Color="Color.Primary" Variant="Variant.Filled" OnClick="SaveAsync"
+                   Disabled="@(_busy || !CanEdit)">
+            保存规则
+        </MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [CascadingParameter]
+    private IMudDialogInstance MudDialog { get; set; } = default!;
+
+    [Parameter]
+    public LinkDto Link { get; set; } = default!;
+
+    private static readonly (string Value, string Label)[] RouteFieldOptions =
+    [
+        ("country", "国家 / 地区"),
+        ("province", "省份"),
+        ("device", "设备类型"),
+        ("browser", "浏览器"),
+        ("os", "操作系统"),
+        ("language", "语言"),
+        ("referer", "来源页"),
+        ("query", "查询参数"),
+    ];
+
+    private static readonly (string Value, string Label)[] RouteOperatorOptions =
+    [
+        ("eq", "等于"),
+        ("neq", "不等于"),
+        ("contains", "包含"),
+        ("not_contains", "不包含"),
+        ("prefix", "前缀匹配"),
+        ("in", "属于（多值）"),
+        ("not_in", "不属于（多值）"),
+        ("exists", "存在"),
+        ("not_exists", "不存在"),
+    ];
+
+    private readonly List<RouteDraft> _routes = [];
+    private readonly RouteTestRequest _test = new() { Repeat = 1000 };
+    private string? _testQuery;
+    private RouteTestResult? _testResult;
+    private string? _error;
+    private bool _busy;
+    private bool _testing;
+
+    private bool CanEdit => Perms.CanModify(Link);
+
+    private string FallbackHint => string.IsNullOrWhiteSpace(Link.FallbackUrl) ? "目标地址" : Link.FallbackUrl!;
+
+    protected override async Task OnInitializedAsync()
+    {
+        var response = await Api.GetRoutesAsync(Link.Id);
+        if (response.Code != BizCodes.Success || response.Data is null)
+        {
+            Api.NotifyIfFailed(response);
+            return;
+        }
+
+        foreach (var route in response.Data)
+        {
+            _routes.Add(new RouteDraft
+            {
+                Name = route.Name,
+                Priority = route.Priority,
+                Weight = route.Weight,
+                TargetUrl = route.TargetUrl,
+                Match = route.Match,
+                IsEnabled = route.IsEnabled,
+                ClickCount = route.ClickCount,
+                Conditions = route.Conditions
+                    .Select(c => new ConditionDraft { Field = c.Field, Op = c.Op, Value = c.Value })
+                    .ToList(),
+            });
+        }
+    }
+
+    private void AddRoute()
+    {
+        var nextPriority = _routes.Count == 0 ? 0 : _routes.Max(r => r.Priority);
+        _routes.Add(new RouteDraft
+        {
+            Name = $"分支 {_routes.Count + 1}",
+            Priority = nextPriority,
+            Weight = 100,
+            TargetUrl = Link.TargetUrl,
+        });
+    }
+
+    private void RemoveRoute(int index)
+    {
+        if (index >= 0 && index < _routes.Count)
+        {
+            _routes.RemoveAt(index);
+        }
+    }
+
+    /// <summary>把占比转成 CSS 宽度。用 InvariantCulture 避免小数点在部分区域设置下变成逗号导致样式失效。</summary>
+    private static string BarWidth(double percent)
+        => string.Create(
+            System.Globalization.CultureInfo.InvariantCulture,
+            $"width:{Math.Clamp(percent, 0, 100):0.##}%;");
+
+    private static string ValueLabel(string field, string op)    {
+        if (op is "exists" or "not_exists")
+        {
+            return field == "query" ? "键名（可留空）" : "此运算符忽略取值";
+        }
+
+        return field switch
+        {
+            "query" => "键=值（如 utm_source=wechat）",
+            "in" or "not_in" => "多值，逗号分隔",
+            _ => "期望值",
+        };
+    }
+
+    private async Task SaveAsync()
+    {
+        _error = null;
+
+        var invalid = _routes.FirstOrDefault(r => string.IsNullOrWhiteSpace(r.TargetUrl));
+        if (invalid is not null)
+        {
+            _error = "每个分支都必须填写目标地址";
+            return;
+        }
+
+        var request = new SaveLinkRoutesRequest
+        {
+            Routes = _routes.Select(r => new LinkRouteInput
+            {
+                Name = string.IsNullOrWhiteSpace(r.Name) ? "未命名分支" : r.Name.Trim(),
+                Priority = r.Priority,
+                Weight = r.Weight,
+                TargetUrl = r.TargetUrl.Trim(),
+                Match = r.Match,
+                IsEnabled = r.IsEnabled,
+                Conditions = r.Conditions
+                    .Where(c => !string.IsNullOrWhiteSpace(c.Field))
+                    .Select(c => new RouteConditionDto
+                    {
+                        Field = c.Field,
+                        Op = c.Op,
+                        Value = (c.Value ?? string.Empty).Trim(),
+                    })
+                    .ToList(),
+            }).ToList(),
+        };
+
+        _busy = true;
+        try
+        {
+            var response = await Api.SaveRoutesAsync(Link.Id, request);
+            if (response.Code == BizCodes.Success)
+            {
+                Snackbar.Add($"已保存 {request.Routes.Count} 条分支", Severity.Success);
+                MudDialog.Close(DialogResult.Ok(request.Routes.Count));
+                return;
+            }
+
+            _error = ErrorMessages.From(response.Code, response.Msg);
+        }
+        finally
+        {
+            _busy = false;
+        }
+    }
+
+    private async Task RunTestAsync()
+    {
+        _testing = true;
+        try
+        {
+            _test.Query = ParseQuery(_testQuery);
+            var response = await Api.TestRoutesAsync(Link.Id, _test);
+            if (response.Code == BizCodes.Success && response.Data is not null)
+            {
+                _testResult = response.Data;
+                return;
+            }
+
+            _testResult = null;
+            Api.NotifyIfFailed(response);
+        }
+        finally
+        {
+            _testing = false;
+        }
+    }
+
+    private static Dictionary<string, string> ParseQuery(string? raw)
+    {
+        var result = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+        if (string.IsNullOrWhiteSpace(raw))
+        {
+            return result;
+        }
+
+        foreach (var pair in raw.Split('&', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
+        {
+            var separator = pair.IndexOf('=');
+            if (separator < 0)
+            {
+                result[pair] = string.Empty;
+                continue;
+            }
+
+            result[pair[..separator].Trim()] = pair[(separator + 1)..].Trim();
+        }
+
+        return result;
+    }
+
+    private void Close() => MudDialog.Close();
+
+    private sealed class RouteDraft
+    {
+        public string Name { get; set; } = string.Empty;
+
+        public int Priority { get; set; }
+
+        public int Weight { get; set; }
+
+        public string TargetUrl { get; set; } = string.Empty;
+
+        public string Match { get; set; } = "all";
+
+        public bool IsEnabled { get; set; } = true;
+
+        public long ClickCount { get; set; }
+
+        public List<ConditionDraft> Conditions { get; set; } = [];
+    }
+
+    private sealed class ConditionDraft
+    {
+        public string Field { get; set; } = "country";
+
+        public string Op { get; set; } = "eq";
+
+        public string Value { get; set; } = string.Empty;
+    }
+}
+
+<style>
+    .route-card {
+        border: 1px solid #f0e4e6;
+        border-radius: 14px;
+        background: #fff;
+    }
+
+    .empty {
+        border: 1px dashed #e6cfd3;
+        border-radius: 14px;
+        text-align: center;
+        color: #8a6a6f;
+    }
+
+    .result {
+        border: 1px solid #f0e4e6;
+        border-radius: 14px;
+        background: #fffafb;
+    }
+
+    .bucket {
+        margin-bottom: 10px;
+    }
+
+    .bucket-head {
+        display: flex;
+        justify-content: space-between;
+        font-size: 12px;
+        color: #6b4a4f;
+        margin-bottom: 4px;
+    }
+
+    .bucket-bar {
+        height: 8px;
+        border-radius: 999px;
+        background: #f7e6e9;
+        overflow: hidden;
+    }
+
+    .bucket-bar span {
+        display: block;
+        height: 100%;
+        border-radius: 999px;
+        background: linear-gradient(90deg, #d70b2a, #8c0619);
+    }
+
+    .hint {
+        font-size: 12px;
+        color: #9b8085;
+    }
+</style>

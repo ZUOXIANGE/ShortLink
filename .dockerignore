@@ -1,0 +1,35 @@
+# 版本控制与本地工作区
+.git
+.gitignore
+.vs
+.vscode
+.idea
+.workbuddy
+*.user
+*.suo
+
+# 构建与测试产物
+**/bin
+**/obj
+artifacts
+TestResults
+coverage*
+*.trx
+
+# 运行时数据与密钥
+.env
+.env.*
+appsettings.*.local.json
+*.pfx
+*.key
+*.db
+*.db-shm
+*.db-wal
+*.sqlite
+*.sqlite3
+**/data
+**/logs
+
+# 文档与不需要进入镜像上下文的文件
+README.md
+docs

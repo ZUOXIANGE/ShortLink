@@ -1,0 +1,141 @@
+@inject ApiClient Api
+@inject ISnackbar Snackbar
+
+<MudDialog>
+    <TitleContent>
+        <MudText Typo="Typo.h6">@(IsEdit ? "编辑域名" : "新增域名")</MudText>
+    </TitleContent>
+    <DialogContent>
+        <MudStack Spacing="3" Class="mt-2">
+            <MudTextField @bind-Value="_host"
+                          Label="域名"
+                          Placeholder="s.example.com"
+                          HelperText="@(IsEdit ? "域名创建后不可修改，避免已分发短链失效" : "只填主机名，可带端口，例如 localhost:5080")"
+                          Variant="Variant.Outlined"
+                          Margin="Margin.Dense"
+                          Disabled="@IsEdit" />
+
+            <MudSelect T="string" @bind-Value="_scheme" Label="对外协议" Variant="Variant.Outlined" Margin="Margin.Dense">
+                <MudSelectItem T="string" Value="@("https")">https</MudSelectItem>
+                <MudSelectItem T="string" Value="@("http")">http</MudSelectItem>
+            </MudSelect>
+
+            <MudTextField @bind-Value="_name"
+                          Label="显示名称（可选）"
+                          Variant="Variant.Outlined"
+                          Margin="Margin.Dense" />
+
+            <MudSwitch @bind-Value="_isDefault" Color="Color.Primary" Label="设为默认域名" />
+            <MudSwitch @bind-Value="_isEnabled" Color="Color.Primary" Label="启用" />
+
+            @if (!string.IsNullOrEmpty(_error))
+            {
+                <MudAlert Severity="Severity.Error" Dense="true">@_error</MudAlert>
+            }
+        </MudStack>
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="Cancel">取消</MudButton>
+        <MudButton Color="Color.Primary" Variant="Variant.Filled" OnClick="SubmitAsync" Disabled="_busy">
+            @(IsEdit ? "保存" : "创建")
+        </MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [CascadingParameter]
+    private IMudDialogInstance MudDialog { get; set; } = default!;
+
+    [Parameter]
+    public DomainDto? Domain { get; set; }
+
+    private string _host = string.Empty;
+    private string _scheme = "https";
+    private string _name = string.Empty;
+    private bool _isDefault;
+    private bool _isEnabled = true;
+    private string? _error;
+    private bool _busy;
+
+    private bool IsEdit => Domain is not null;
+
+    protected override void OnInitialized()
+    {
+        if (Domain is null)
+        {
+            return;
+        }
+
+        _host = Domain.Host;
+        _scheme = Domain.Scheme;
+        _name = Domain.Name;
+        _isDefault = Domain.IsDefault;
+        _isEnabled = Domain.IsEnabled;
+    }
+
+    private void Cancel() => MudDialog.Cancel();
+
+    private async Task SubmitAsync()
+    {
+        _error = null;
+
+        if (!IsEdit && string.IsNullOrWhiteSpace(_host))
+        {
+            _error = "请填写域名";
+            return;
+        }
+
+        _busy = true;
+        try
+        {
+            if (Domain is null)
+            {
+                var created = await Api.CreateDomainAsync(new CreateDomainRequest
+                {
+                    Host = _host.Trim(),
+                    Scheme = _scheme,
+                    Name = _name,
+                    IsDefault = _isDefault,
+                    IsEnabled = _isEnabled,
+                });
+
+                if (created.Code != BizCodes.Success)
+                {
+                    _error = FirstError(created) ?? ErrorMessages.From(created.Code, created.Msg);
+                    return;
+                }
+
+                Snackbar.Add("域名已创建", Severity.Success);
+            }
+            else
+            {
+                var updated = await Api.UpdateDomainAsync(Domain.Id, new UpdateDomainRequest
+                {
+                    Scheme = _scheme,
+                    Name = _name,
+                    IsDefault = _isDefault,
+                    IsEnabled = _isEnabled,
+                });
+
+                if (updated.Code != BizCodes.Success)
+                {
+                    _error = FirstError(updated) ?? ErrorMessages.From(updated.Code, updated.Msg);
+                    return;
+                }
+
+                Snackbar.Add("域名已更新", Severity.Success);
+            }
+
+            MudDialog.Close(DialogResult.Ok(true));
+        }
+        finally
+        {
+            _busy = false;
+        }
+    }
+
+    private static string? FirstError<T>(ApiResponse<T> response)
+        => response.Errors is { Count: > 0 }
+            ? response.Errors.SelectMany(pair => pair.Value).FirstOrDefault()
+            : null;
+}

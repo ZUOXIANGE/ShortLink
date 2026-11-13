@@ -1,0 +1,167 @@
+@page "/domains"
+@attribute [Authorize]
+@inject ApiClient Api
+@inject IDialogService DialogService
+@inject ISnackbar Snackbar
+
+<div class="d-flex align-center justify-space-between mb-4">
+    <div>
+        <h1 class="page-title">域名管理</h1>
+        <p class="page-subtitle">短链域名决定对外展示的短链前缀；未匹配的 Host 会回退到默认域名</p>
+    </div>
+    @if (_canManage)
+    {
+        <MudButton Variant="Variant.Filled" Color="Color.Primary" StartIcon="@Icons.Material.Filled.Add" OnClick="CreateAsync">
+            新增域名
+        </MudButton>
+    }
+</div>
+
+@if (_loading)
+{
+    <MudProgressLinear Color="Color.Primary" Indeterminate="true" Class="mb-4" />
+}
+
+<MudTable Items="_domains" Dense="true" Hover="true" Elevation="0" Loading="_loading"
+          Style="border:1px solid #F0E4E6;border-radius:14px;overflow:hidden;">
+    <HeaderContent>
+        <MudTh>域名</MudTh>
+        <MudTh>名称</MudTh>
+        <MudTh>协议</MudTh>
+        <MudTh>短链数</MudTh>
+        <MudTh>状态</MudTh>
+        <MudTh>操作</MudTh>
+    </HeaderContent>
+    <RowTemplate>
+        <MudTd DataLabel="域名">
+            <span class="mono host">@context.Host</span>
+            @if (context.IsDefault)
+            {
+                <MudChip T="string" Size="Size.Small" Color="Color.Primary" Class="ml-2">默认</MudChip>
+            }
+        </MudTd>
+        <MudTd DataLabel="名称">@context.Name</MudTd>
+        <MudTd DataLabel="协议">@context.Scheme</MudTd>
+        <MudTd DataLabel="短链数">@context.LinkCount</MudTd>
+        <MudTd DataLabel="状态">
+            @if (context.IsEnabled)
+            {
+                <MudChip T="string" Size="Size.Small" Color="Color.Success">启用中</MudChip>
+            }
+            else
+            {
+                <MudChip T="string" Size="Size.Small" Color="Color.Default">已停用</MudChip>
+            }
+        </MudTd>
+        <MudTd DataLabel="操作">
+            @if (context.CanManage)
+            {
+                <MudMenu Icon="@Icons.Material.Filled.MoreVert" Size="Size.Small" Dense="true">
+                    <MudMenuItem OnClick="@(() => EditAsync(context))">编辑</MudMenuItem>
+                    <MudMenuItem OnClick="@(() => DeleteAsync(context))">删除</MudMenuItem>
+                </MudMenu>
+            }
+            else
+            {
+                <span class="text-muted">只读</span>
+            }
+        </MudTd>
+    </RowTemplate>
+    <NoRecordsContent>
+        <MudText Typo="Typo.body2" Class="pa-6" Align="Align.Center">还没有配置域名，先新增一个吧。</MudText>
+    </NoRecordsContent>
+</MudTable>
+
+<MudAlert Severity="Severity.Info" Variant="Variant.Outlined" Class="mt-4" Dense="true">
+    域名创建后不可修改，避免已分发的短链失效；如确需更换域名，请新增域名并重新创建短链。
+</MudAlert>
+
+@code {
+    private IReadOnlyList<DomainDto> _domains = [];
+    private bool _loading = true;
+    private bool _canManage;
+
+    protected override async Task OnInitializedAsync()
+    {
+        var currentUser = await Api.GetCurrentUserAsync();
+        _canManage = currentUser.Data?.CanManageGlobalDomains == true;
+        await LoadAsync();
+    }
+
+    private async Task LoadAsync()
+    {
+        _loading = true;
+        try
+        {
+            var response = await Api.GetDomainsAsync();
+            if (response.Code == BizCodes.Success && response.Data is not null)
+            {
+                _domains = response.Data;
+                return;
+            }
+
+            Api.NotifyIfFailed(response);
+        }
+        finally
+        {
+            _loading = false;
+        }
+    }
+
+    private async Task CreateAsync()
+    {
+        var dialog = await DialogService.ShowAsync<DomainEditDialog>("新增域名",
+            new DialogParameters<DomainEditDialog>(),
+            new DialogOptions { MaxWidth = MaxWidth.Small, FullWidth = true });
+
+        var result = await dialog.Result;
+        if (result is { Canceled: false })
+        {
+            await LoadAsync();
+        }
+    }
+
+    private async Task EditAsync(DomainDto domain)
+    {
+        var parameters = new DialogParameters<DomainEditDialog> { { x => x.Domain, domain } };
+        var dialog = await DialogService.ShowAsync<DomainEditDialog>("编辑域名", parameters,
+            new DialogOptions { MaxWidth = MaxWidth.Small, FullWidth = true });
+
+        var result = await dialog.Result;
+        if (result is { Canceled: false })
+        {
+            await LoadAsync();
+        }
+    }
+
+    private async Task DeleteAsync(DomainDto domain)
+    {
+        var confirmed = await DialogService.ShowMessageBoxAsync(
+            "删除域名",
+            $"确定删除 {domain.Host} 吗？域名下仍有短链时会被拒绝。",
+            yesText: "删除",
+            cancelText: "取消");
+
+        if (confirmed != true)
+        {
+            return;
+        }
+
+        var response = await Api.DeleteDomainAsync(domain.Id);
+        if (response.Code == BizCodes.Success)
+        {
+            Snackbar.Add("域名已删除", Severity.Success);
+            await LoadAsync();
+            return;
+        }
+
+        Api.NotifyIfFailed(response);
+    }
+}
+
+<style>
+    .host {
+        font-weight: 600;
+        color: #8c0619;
+    }
+</style>

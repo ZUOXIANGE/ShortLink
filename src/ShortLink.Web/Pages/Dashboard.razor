@@ -1,0 +1,182 @@
+@page "/"
+@attribute [Authorize]
+@inject ApiClient Api
+
+<div class="d-flex align-center justify-space-between mb-4">
+    <div>
+        <h1 class="page-title">控制台</h1>
+        <p class="page-subtitle">短链规模、访问趋势与热门链接一览</p>
+    </div>
+    <MudStack Row="true" Spacing="2" AlignItems="AlignItems.Center">
+        <MudSelect T="int" Value="_days" ValueChanged="OnDaysChanged" Dense="true" Variant="Variant.Outlined" Style="width:130px;">
+            <MudSelectItem T="int" Value="7">近 7 天</MudSelectItem>
+            <MudSelectItem T="int" Value="14">近 14 天</MudSelectItem>
+            <MudSelectItem T="int" Value="30">近 30 天</MudSelectItem>
+        </MudSelect>
+        <MudButton Variant="Variant.Outlined" Color="Color.Primary" StartIcon="@Icons.Material.Filled.Refresh" OnClick="ReloadAsync">
+            刷新
+        </MudButton>
+    </MudStack>
+</div>
+
+@if (_loading)
+{
+    <MudProgressLinear Color="Color.Primary" Indeterminate="true" Class="mb-4" />
+}
+
+@if (_overview is null)
+{
+    <MudAlert Severity="Severity.Info" Variant="Variant.Outlined">@(_error ?? "暂无数据")</MudAlert>
+}
+else
+{
+    <MudGrid Spacing="3">
+        <MudItem xs="12" sm="6" md="3">
+            <MudPaper Elevation="0" Class="kpi pa-4">
+                <div class="kpi-label">短链总数</div>
+                <div class="kpi-value">@_overview.TotalLinks</div>
+                <div class="kpi-foot">启用 @_overview.EnabledLinks · 过期 @_overview.ExpiredLinks</div>
+            </MudPaper>
+        </MudItem>
+        <MudItem xs="12" sm="6" md="3">
+            <MudPaper Elevation="0" Class="kpi pa-4">
+                <div class="kpi-label">今日点击</div>
+                <div class="kpi-value">@_overview.TodayClicks</div>
+                <div class="kpi-foot">昨日 @_overview.YesterdayClicks</div>
+            </MudPaper>
+        </MudItem>
+        <MudItem xs="12" sm="6" md="3">
+            <MudPaper Elevation="0" Class="kpi pa-4">
+                <div class="kpi-label">累计点击</div>
+                <div class="kpi-value">@_overview.TotalClicks</div>
+                <div class="kpi-foot">全部时间 · 转化 @_overview.TotalConversions 笔</div>
+            </MudPaper>
+        </MudItem>
+        <MudItem xs="12" sm="6" md="3">
+            <MudPaper Elevation="0" Class="kpi pa-4">
+                <div class="kpi-label">今日独立访客</div>
+                <div class="kpi-value">@_overview.UniqueVisitorsToday</div>
+                <div class="kpi-foot">域名 @_overview.TotalDomains 个</div>
+            </MudPaper>
+        </MudItem>
+
+        <MudItem xs="12">
+            <ClickTrend Data="_overview.Trend" />
+        </MudItem>
+
+        <MudItem xs="12" md="7">
+            <MudPaper Elevation="0" Class="pa-4" Style="border:1px solid #F0E4E6;border-radius:14px;">
+                <MudText Typo="Typo.subtitle2" Class="mb-2">热门短链</MudText>
+                <MudSimpleTable Dense="true" Hover="true" Elevation="0">
+                    <thead>
+                        <tr>
+                            <th>短码</th>
+                            <th>标题 / 目标</th>
+                            <th style="width:90px;text-align:right;">点击</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @if (_overview.TopLinks.Count == 0)
+                        {
+                            <tr><td colspan="3" style="text-align:center;color:#8a6a6f;">暂无数据</td></tr>
+                        }
+                        @foreach (var link in _overview.TopLinks)
+                        {
+                            <tr>
+                                <td>
+                                    <a class="mono link" href="@($"/links/{link.Id}/stats")">/@link.Code</a>
+                                </td>
+                                <td>
+                                    <div class="truncate">@(link.Title ?? link.TargetUrl)</div>
+                                    <div class="hint mono truncate">@link.TargetUrl</div>
+                                </td>
+                                <td style="text-align:right;font-weight:600;color:#8c0619;">@link.Clicks</td>
+                            </tr>
+                        }
+                    </tbody>
+                </MudSimpleTable>
+            </MudPaper>
+        </MudItem>
+
+        <MudItem xs="12" md="5">
+            <MudPaper Elevation="0" Class="pa-4" Style="border:1px solid #F0E4E6;border-radius:14px;height:100%;">
+                <MudText Typo="Typo.subtitle2" Class="mb-2">快捷入口</MudText>
+                <MudStack Spacing="2">
+                    <MudButton Href="/links" Variant="Variant.Filled" Color="Color.Primary" StartIcon="@Icons.Material.Filled.AddLink" FullWidth="true">
+                        创建短链接
+                    </MudButton>
+                    <MudButton Href="/domains" Variant="Variant.Outlined" Color="Color.Primary" StartIcon="@Icons.Material.Filled.Dns" FullWidth="true">
+                        管理短链域名
+                    </MudButton>
+                </MudStack>
+                <MudDivider Class="my-4" />
+                <MudText Typo="Typo.body2" Class="hint">
+                    统计口径：点击数据由跳转链路异步落库，通常 1~2 秒内可见；机器人访问计入点击但不计入独立访客。
+                </MudText>
+            </MudPaper>
+        </MudItem>
+    </MudGrid>
+}
+
+@code {
+    private DashboardOverviewDto? _overview;
+    private bool _loading = true;
+    private string? _error;
+    private int _days = 14;
+
+    protected override async Task OnInitializedAsync() => await ReloadAsync();
+
+    private async Task OnDaysChanged(int days)
+    {
+        _days = days;
+        await ReloadAsync();
+    }
+
+    private async Task ReloadAsync()
+    {
+        _loading = true;
+        try
+        {
+            var response = await Api.GetDashboardAsync(_days);
+            if (response.Code == BizCodes.Success)
+            {
+                _overview = response.Data;
+                _error = null;
+            }
+            else
+            {
+                _error = ErrorMessages.From(response.Code, response.Msg);
+                Api.NotifyIfFailed(response);
+            }
+        }
+        finally
+        {
+            _loading = false;
+        }
+    }
+}
+
+<style>
+    .kpi {
+        border: 1px solid #F0E4E6;
+        border-radius: 14px;
+        background: #fff;
+    }
+
+    .kpi-foot {
+        margin-top: 8px;
+        font-size: 12px;
+        color: #9b8085;
+    }
+
+    .link {
+        color: #d70b2a;
+        text-decoration: none;
+        font-weight: 600;
+    }
+
+    .hint {
+        font-size: 12px;
+        color: #9b8085;
+    }
+</style>

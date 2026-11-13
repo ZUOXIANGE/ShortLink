@@ -1,0 +1,75 @@
+@* 维度占比列表：用横条宽度表达相对量，避免引入图表库 *@
+<MudPaper Elevation="0" Class="pa-4" Style="border:1px solid #F0E4E6;border-radius:14px;height:100%;">
+    <MudText Typo="Typo.subtitle2" Class="mb-2">@Title</MudText>
+
+    @if (Items.Count == 0)
+    {
+        <MudText Typo="Typo.body2" Class="py-4" Align="Align.Center">暂无数据</MudText>
+    }
+    else
+    {
+        @foreach (var item in Items)
+        {
+            var percent = Percent(item.Clicks);
+            <div class="row">
+                <div class="d-flex justify-space-between">
+                    <span class="name">@item.Name</span>
+                    <span class="count">@item.Clicks</span>
+                </div>
+                <div class="track"><div class="fill" style="width:@($"{percent:0.#}")%"></div></div>
+            </div>
+        }
+    }
+</MudPaper>
+
+@code {
+    [Parameter]
+    public string Title { get; set; } = string.Empty;
+
+    [Parameter]
+    public IReadOnlyList<DimensionItemDto> Items { get; set; } = [];
+
+    private long _max;
+
+    protected override void OnParametersSet()
+    {
+        _max = Items.Count == 0 ? 0 : Math.Max(1, Items.Max(i => i.Clicks));
+    }
+
+    private double Percent(long value) => _max == 0 ? 0 : Math.Round(value * 100d / _max, 1);
+}
+
+<style>
+    .row {
+        margin-bottom: 10px;
+    }
+
+    .name {
+        font-size: 13px;
+        color: #4a2b2f;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+        max-width: 70%;
+    }
+
+    .count {
+        font-size: 12px;
+        color: #8c0619;
+        font-weight: 600;
+    }
+
+    .track {
+        height: 6px;
+        border-radius: 999px;
+        background: #f6eef0;
+        margin-top: 4px;
+        overflow: hidden;
+    }
+
+    .fill {
+        height: 100%;
+        border-radius: 999px;
+        background: linear-gradient(90deg, #d70b2a, #8c0619);
+    }
+</style>

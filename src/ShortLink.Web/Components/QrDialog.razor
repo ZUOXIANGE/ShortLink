@@ -1,0 +1,153 @@
+@using QRCoder
+@inject FileSaver Saver
+@inject IJSRuntime JS
+@inject ISnackbar Snackbar
+
+<MudDialog>
+    <TitleContent>
+        <MudText Typo="Typo.h6">短链二维码</MudText>
+    </TitleContent>
+    <DialogContent>
+        <MudStack Spacing="4" Class="mt-2" AlignItems="AlignItems.Center">
+            <div class="qr-frame">
+                @if (_dataUrl is null)
+                {
+                    <MudProgressCircular Color="Color.Primary" Indeterminate="true" Size="Size.Medium" />
+                }
+                else
+                {
+                    <img src="@_dataUrl" alt="短链二维码" width="240" height="240" />
+                }
+            </div>
+
+            <div class="qr-url mono">@Url</div>
+
+            <MudStack Row="true" Spacing="3" AlignItems="AlignItems.Center" Class="flex-wrap justify-center">
+                <MudSelect T="int" Value="_pixelsPerModule" Label="清晰度" Variant="Variant.Outlined"
+                           Margin="Margin.Dense" Style="width:150px;" ValueChanged="OnResolutionChanged"
+                           Dense="true">
+                    <MudSelectItem T="int" Value="8">标准（8）</MudSelectItem>
+                    <MudSelectItem T="int" Value="12">高清（12）</MudSelectItem>
+                    <MudSelectItem T="int" Value="20">印刷（20）</MudSelectItem>
+                </MudSelect>
+
+                <MudButton Variant="Variant.Filled" Color="Color.Primary"
+                           StartIcon="@Icons.Material.Filled.Download" OnClick="DownloadAsync">
+                    下载 PNG
+                </MudButton>
+
+                <MudButton Variant="Variant.Outlined" Color="Color.Primary"
+                           StartIcon="@Icons.Material.Filled.ContentCopy" OnClick="CopyAsync">
+                    复制链接
+                </MudButton>
+            </MudStack>
+
+            <MudText Typo="Typo.caption" Class="hint">
+                二维码在浏览器本地生成，短链内容不会上传到任何第三方服务。
+            </MudText>
+        </MudStack>
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="Close">关闭</MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [CascadingParameter]
+    private IMudDialogInstance MudDialog { get; set; } = default!;
+
+    [Parameter]
+    public string Url { get; set; } = string.Empty;
+
+    /// <summary>下载时的文件名主干，通常传短码。</summary>
+    [Parameter]
+    public string Code { get; set; } = "qr";
+
+    private int _pixelsPerModule = 12;
+    private byte[]? _png;
+    private string? _dataUrl;
+
+    protected override void OnParametersSet() => Render();
+
+    private void OnResolutionChanged(int value)
+    {
+        _pixelsPerModule = value;
+        Render();
+    }
+
+    /// <summary>
+    /// 生成 PNG 字节。刻意使用 <see cref="PngByteQRCode"/> 而非依赖 System.Drawing 的 <c>QRCode</c>，
+    /// 前者是纯托管实现，在 WebAssembly 内可直接运行。
+    /// </summary>
+    private void Render()
+    {
+        if (string.IsNullOrWhiteSpace(Url))
+        {
+            return;
+        }
+
+        using var generator = new QRCodeGenerator();
+        using var data = generator.CreateQrCode(Url, QRCodeGenerator.ECCLevel.M);
+        _png = new PngByteQRCode(data).GetGraphic(_pixelsPerModule);
+        _dataUrl = $"data:image/png;base64,{Convert.ToBase64String(_png)}";
+    }
+
+    private async Task DownloadAsync()
+    {
+        if (_png is null)
+        {
+            return;
+        }
+
+        var saved = await Saver.SaveAsync($"{Code}-{_pixelsPerModule}x.png", "image/png", _png);
+        if (!saved)
+        {
+            Snackbar.Add("下载失败，请检查浏览器下载权限", Severity.Warning);
+        }
+    }
+
+    private async Task CopyAsync()
+    {
+        try
+        {
+            await JS.InvokeVoidAsync("navigator.clipboard.writeText", Url);
+            Snackbar.Add("已复制到剪贴板", Severity.Success);
+        }
+        catch (JSException)
+        {
+            Snackbar.Add($"复制失败，请手动复制：{Url}", Severity.Warning);
+        }
+    }
+
+    private void Close() => MudDialog.Close();
+}
+
+<style>
+    .qr-frame {
+        display: grid;
+        place-items: center;
+        width: 264px;
+        height: 264px;
+        background: #fff;
+        border: 1px solid #f0e4e6;
+        border-radius: 16px;
+    }
+
+    .qr-frame img {
+        image-rendering: pixelated;
+    }
+
+    .qr-url {
+        font-size: 12px;
+        color: #8c0619;
+        word-break: break-all;
+        text-align: center;
+        max-width: 360px;
+    }
+
+    .hint {
+        font-size: 12px;
+        color: #9b8085;
+        text-align: center;
+    }
+</style>
