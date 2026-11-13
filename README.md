@@ -65,9 +65,20 @@ dotnet run --project src/ShortLink.AppHost
 
 | 入口 | 地址 |
 | --- | --- |
-| 仪表盘（traces / metrics / logs） | <http://localhost:15000> |
+| Aspire 仪表盘（资源状态 / 容器日志） | <http://localhost:15000> |
+| OpenObserve（traces / metrics / logs） | 端口随机，见仪表盘里的 `openobserve` 资源 |
 | API | <http://localhost:5080> |
 | 管理后台 | <http://localhost:5081> |
+
+本地开发账号（**仅用于本机编排，生产必须全部替换**）：
+
+| 用途 | 账号 | 密码 | 来源 |
+| --- | --- | --- | --- |
+| 管理后台 / API | `admin` | `Admin@123456` | AppHost 的 `seed-admin-password` 参数（`Seed__AdminPassword`） |
+| OpenObserve（组织 `default`） | `root@shortlink.local` | `Observe@123456` | AppHost 的 `ZO_ROOT_USER_EMAIL` / `ZO_ROOT_USER_PASSWORD` |
+| MySQL（容器） | `root` | `ChangeMe_123!` | AppHost 的 `mysql-password` 参数 |
+
+OpenObserve 的 OTLP 入口是 `http://<host>:<port>/api/default`、HTTP Basic 认证；AppHost 会自动把端点、协议与 `Authorization` 头注入 API，无需手工配置。
 
 默认用 Docker 拉起 MySQL 8.4 与 Redis，按依赖顺序启动 API 与 Web。零容器模式：
 
@@ -95,7 +106,9 @@ dotnet run --project src/ShortLink.Web    # http://localhost:5081
 }
 ```
 
-常用环境变量：`Jwt__SigningKey`（≥32 字节）、`Seed__AdminPassword`、`Cache__RedisConnectionString`、`OpenTelemetry__Endpoint`。API 启动时自动迁移，无需手工 `database update`。
+常用环境变量：`Jwt__SigningKey`（≥32 字节）、`Seed__AdminPassword`、`Cache__RedisConnectionString`、`OpenTelemetry__Endpoint`、`OpenTelemetry__Headers`。API 启动时自动迁移，无需手工 `database update`。
+
+接 OpenObserve 时：`OTEL_EXPORTER_OTLP_ENDPOINT=http://<host>:<port>/api/<org>`、`OTEL_EXPORTER_OTLP_PROTOCOL=http/protobuf`、`OTEL_EXPORTER_OTLP_HEADERS=Authorization=Basic%20<base64(email:password)>`（环境变量形态下空格要写成 `%20`；走 `OpenTelemetry__Headers` 配置时用普通空格）。
 
 ### 测试
 
