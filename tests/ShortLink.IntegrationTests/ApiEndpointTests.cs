@@ -39,6 +39,8 @@ public sealed class ApiFactory : WebApplicationFactory<Program>
                 ["Seed:DefaultDomainScheme"] = "http",
                 ["Cache:RedisConnectionString"] = string.Empty,
                 ["OpenTelemetry:Endpoint"] = string.Empty,
+                // 测试宿主的内容根指向 Api 项目目录，不关文件日志会把测试输出写进仓库。
+                ["Serilog:File:Enabled"] = "false",
                 ["RateLimit:AuthPermitPerMinute"] = "1000",
                 ["RateLimit:ConversionPermitPerMinute"] = "1000",
                 ["RateLimit:AbusePermitPerMinute"] = "1000",

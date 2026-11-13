@@ -34,6 +34,10 @@ const int WebPort = 5081;
 
 const string MySqlDevPassword = "ChangeMe_123!";
 
+// OpenObserve 仅用于本地编排（发布产物不带它），root 账号也相当于本地开发凭据。
+const string OpenObserveUser = "root@shortlink.local";
+const string OpenObserveDevPassword = "Observe@123456";
+
 // publish 模式下参数不能带开发默认值：生成物里的口令/密钥必须是「运维填」的占位符，
 // 把 dev 口令写进 compose/k8s 是最容易被复制到生产的一类事故。
 var isPublishMode = builder.ExecutionContext.IsPublishMode;
@@ -44,8 +48,10 @@ var useMySql = !string.Equals(
     builder.Configuration["ShortLink:Database"], "sqlite", StringComparison.OrdinalIgnoreCase);
 var useRedis = ReadBool(builder.Configuration, "ShortLink:UseRedis", fallback: true);
 var useKafka = ReadBool(builder.Configuration, "ShortLink:UseKafka", fallback: false);
+var useOpenObserve = ReadBool(builder.Configuration, "ShortLink:UseOpenObserve", fallback: true);
 var mySqlImageTag = builder.Configuration["ShortLink:MySqlImageTag"] ?? "8.4";
 var mySqlServerVersion = builder.Configuration["ShortLink:MySqlVersion"] ?? "8.4.0";
+var openObserveImageTag = builder.Configuration["ShortLink:OpenObserveImageTag"] ?? "v1.1.2";
 
 // 浏览器实际访问的地址，不是容器网络里的服务名；publish 时必须由部署方显式填写。
 var webPublicOrigin = isPublishMode
@@ -148,15 +154,44 @@ if (useKafka)
             ReferenceExpression.Create($"{kafka.GetEndpoint("tcp").Property(EndpointProperty.HostAndPort)}"));
 }
 
-// 仪表盘的 OTLP/gRPC 端点由 launchSettings 的 ASPIRE_DASHBOARD_OTLP_ENDPOINT_URL 固定下来；
-// 没设时不要瞎猜端口，宁可让链路追踪留空，也不要让 Api 每次导出都报连接失败。
+// ── 可观测性后端：OpenObserve（仅本地编排）──────────────────────────────
+// 本地默认把 traces/metrics/logs 全部发进 OpenObserve；发布产物刻意不包含它，
+// 生产由部署方通过标准 OTEL_EXPORTER_OTLP_* 变量接入自己的实例。
 //
-// publish 模式下刻意不传：那个时候容器里没有 localhost:19000，硬塞等于让导出一直失败。
-// 发布产物里由 Aspire 注入标准的 OTEL_EXPORTER_OTLP_ENDPOINT，Api 侧按标准变量兜底。
-var otlpEndpoint = builder.Configuration["ASPIRE_DASHBOARD_OTLP_ENDPOINT_URL"];
-if (!isPublishMode && !string.IsNullOrWhiteSpace(otlpEndpoint))
+// 它的 OTLP/HTTP 入口形如 /api/<org>/v1/{traces,metrics,logs}：这里注入「基础地址」，
+// 由 Api 按信号拼后缀（OpenTelemetry:Endpoint 的约定）。认证是 HTTP Basic，
+// 凭据为登录邮箱:密码的 Base64；代码里配置（而非 OTEL_EXPORTER_OTLP_HEADERS）
+// 时用普通空格即可，只有环境变量形态才需要把空格写成 %20。
+if (!isPublishMode && useOpenObserve)
 {
-    api.WithEnvironment("OpenTelemetry__Endpoint", otlpEndpoint);
+    const string OpenObserveOrg = "default";
+
+    var openObserve = builder.AddContainer("openobserve", "openobserve/openobserve", openObserveImageTag)
+        // 5080 在宿主机上被 Api 占用，容器端口出宿主一律随机分配（Aspire 会给出实际地址）。
+        .WithHttpEndpoint(targetPort: 5080, name: "http")
+        .WithEnvironment("ZO_ROOT_USER_EMAIL", OpenObserveUser)
+        .WithEnvironment("ZO_ROOT_USER_PASSWORD", OpenObserveDevPassword)
+        .WithEnvironment("ZO_DATA_DIR", "/data")
+        .WithVolume("shortlink-openobserve-data", "/data");
+
+    var basicAuth = Convert.ToBase64String(
+        System.Text.Encoding.UTF8.GetBytes($"{OpenObserveUser}:{OpenObserveDevPassword}"));
+
+    api.WaitFor(openObserve)
+        .WithEnvironment(
+            "OpenTelemetry__Endpoint",
+            ReferenceExpression.Create(
+                $"http://{openObserve.GetEndpoint("http").Property(EndpointProperty.HostAndPort)}/api/{OpenObserveOrg}"))
+        .WithEnvironment("OTEL_EXPORTER_OTLP_PROTOCOL", "http/protobuf")
+        .WithEnvironment("OpenTelemetry__Headers", $"Authorization=Basic {basicAuth}");
+}
+else if (!isPublishMode && !string.IsNullOrWhiteSpace(builder.Configuration["ASPIRE_DASHBOARD_OTLP_ENDPOINT_URL"]))
+{
+    // 关掉 OpenObserve 时退回 Aspire 仪表盘；不猜端口——没配就让遥测留空，
+    // 也不要让 Api 每次导出都报连接失败。
+    api.WithEnvironment(
+        "OpenTelemetry__Endpoint",
+        builder.Configuration["ASPIRE_DASHBOARD_OTLP_ENDPOINT_URL"]!);
 }
 
 // 管理后台：纯静态 WASM，只需等 API 起来（种子账号与默认域名由 API 启动时创建）。

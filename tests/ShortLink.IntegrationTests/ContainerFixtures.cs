@@ -55,6 +55,8 @@ public abstract class ContainerizedApiFactory(string databaseProvider, string da
         builder.UseSetting("Seed:AdminPassword", AdminPassword);
         // 观测导出与限流会干扰宿主启动时序，沿用既有测试口径：关导出、放宽限流。
         builder.UseSetting("OpenTelemetry:Endpoint", string.Empty);
+        // 测试宿主的内容根指向 Api 项目目录，不关文件日志会把测试输出写进仓库。
+        builder.UseSetting("Serilog:File:Enabled", "false");
         builder.UseSetting("RateLimit:AuthPermitPerMinute", "1000");
         builder.UseSetting("RateLimit:ConversionPermitPerMinute", "1000");
         builder.UseSetting("RateLimit:AbusePermitPerMinute", "1000");

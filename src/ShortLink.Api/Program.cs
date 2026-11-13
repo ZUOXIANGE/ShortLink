@@ -15,6 +15,7 @@ using OpenTelemetry.Resources;
 using OpenTelemetry.Trace;
 using Scalar.AspNetCore;
 using Serilog;
+using Serilog.Formatting.Compact;
 using ShortLink.Api.Endpoints;
 using ShortLink.Api.Infrastructure;
 using ShortLink.Application;
@@ -28,6 +29,10 @@ using ShortLink.Infrastructure.Persistence;
 using ShortLink.Mcp;
 using ShortLink.Mcp.Diagnostics;
 
+// 控制台与文本文件共用同一份易读模板；结构化文件另走 CLEF（每行一个 JSON）。
+const string ConsoleTemplate = "[{Timestamp:HH:mm:ss} {Level:u3}] {Message:lj} {Properties:j}{NewLine}{Exception}";
+
+// 启动期日志（Host 尚未建好时）走控制台文本模板，与正式运行的 Console sink 一致。
 Log.Logger = new LoggerConfiguration()
     .WriteTo.Console(formatProvider: CultureInfo.InvariantCulture)
     .CreateBootstrapLogger();
@@ -36,15 +41,63 @@ try
 {
     var builder = WebApplication.CreateBuilder(args);
 
-    builder.Host.UseSerilog((_, _, configuration) => configuration
-        .MinimumLevel.Information()
-        .MinimumLevel.Override("Microsoft.AspNetCore", Serilog.Events.LogEventLevel.Warning)
-        .MinimumLevel.Override("Microsoft.EntityFrameworkCore.Database.Command", Serilog.Events.LogEventLevel.Warning)
-        .Enrich.FromLogContext()
-        .Enrich.WithProperty("service.name", "shortlink-api")
-        .WriteTo.Console(
-            formatProvider: CultureInfo.InvariantCulture,
-            outputTemplate: "[{Timestamp:HH:mm:ss} {Level:u3}] {Message:lj} {Properties:j}{NewLine}{Exception}"));
+    // 宿主默认注册的 Console / Debug / EventSource provider 会让同一条日志再以纯文本输出一遍；
+    // 清空后非 Serilog 的 provider 只剩下面按需注册的 OpenTelemetry。
+    builder.Logging.ClearProviders();
+
+    builder.Host.UseSerilog((context, _, configuration) =>
+    {
+        // 控制台给人看：文本模板。文件按配置可同时落两份：
+        //   JsonPath —— CLEF（每行一个 JSON），给机器解析 / 导入 Loki、Elastic；
+        //   TextPath —— 与控制台同一模板，给人翻查。
+        // Serilog:File:Enabled=false 关闭全部文件输出；某一项 Path 留空则跳过那一份。
+        // 相对路径以内容根为基准，避免 dotnet run / systemd / 容器三种启动方式落到不同目录。
+        var fileOptions = context.Configuration.GetSection("Serilog:File");
+
+        string ResolvePath(string configuredPath) => Path.IsPathRooted(configuredPath)
+            ? configuredPath
+            : Path.Combine(context.HostingEnvironment.ContentRootPath, configuredPath);
+
+        configuration
+            // 等级与覆盖项来自 appsettings 的 Serilog 节（Development 可单独调成 Debug）。
+            .ReadFrom.Configuration(context.Configuration)
+            .Enrich.FromLogContext()
+            .Enrich.WithProperty("service.name", "shortlink-api")
+            .WriteTo.Console(
+                formatProvider: CultureInfo.InvariantCulture,
+                outputTemplate: ConsoleTemplate);
+
+        if (fileOptions.GetValue("Enabled", true))
+        {
+            var jsonPath = fileOptions["JsonPath"];
+            if (!string.IsNullOrWhiteSpace(jsonPath))
+            {
+                configuration.WriteTo.File(
+                    new CompactJsonFormatter(),
+                    ResolvePath(jsonPath),
+                    rollingInterval: RollingInterval.Day,
+                    fileSizeLimitBytes: 64 * 1024 * 1024,
+                    rollOnFileSizeLimit: true,
+                    retainedFileCountLimit: 10);
+            }
+
+            var textPath = fileOptions["TextPath"];
+            if (!string.IsNullOrWhiteSpace(textPath))
+            {
+                configuration.WriteTo.File(
+                    ResolvePath(textPath),
+                    formatProvider: CultureInfo.InvariantCulture,
+                    outputTemplate: ConsoleTemplate,
+                    rollingInterval: RollingInterval.Day,
+                    fileSizeLimitBytes: 64 * 1024 * 1024,
+                    rollOnFileSizeLimit: true,
+                    retainedFileCountLimit: 10);
+            }
+        }
+    },
+        // Serilog 默认不把事件转发给 Microsoft.Extensions.Logging 注册的 provider。
+        // 不开这一项，builder.Logging.AddOpenTelemetry 的日志导出器永远收不到任何事件。
+        writeToProviders: true);
 
     // ── 分层注册 ─────────────────────────────────────────────
     builder.Services.AddInfrastructure(builder.Configuration);
@@ -160,10 +213,28 @@ try
         ? OtlpExportProtocol.HttpProtobuf
         : OtlpExportProtocol.Grpc;
 
-    void ConfigureOtlp(OpenTelemetry.Exporter.OtlpExporterOptions exporter)
+    // 需要认证的后端（如 OpenObserve 的 HTTP Basic）走这里配置，格式为 key=value（多组用逗号分隔），
+    // 与 OTLP 规范一致。不设时保留 SDK 对标准 OTEL_EXPORTER_OTLP_HEADERS 的解析（含 %20 解码），
+    // 避免我们手工取值时把环境变量里的百分号编码原样发给后端。
+    var otlpHeaders = builder.Configuration["OpenTelemetry:Headers"];
+
+    // 显式赋值 Endpoint 时 SDK 不会追加信号路径（实测 http/protobuf 模式下三类数据
+    // 都会 POST 到 "/"，Collector 直接 404）。配置项按规范是「基础地址」，
+    // 这里按信号自己拼 /v1/traces、/v1/metrics、/v1/logs（保留运维可能配置的路径前缀）。
+    Uri SignalEndpoint(string signalPath) =>
+        exportProtocol == OtlpExportProtocol.Grpc
+            ? new Uri(otlpEndpoint!)
+            : new Uri($"{otlpEndpoint!.TrimEnd('/')}/{signalPath}");
+
+    void ConfigureOtlp(OpenTelemetry.Exporter.OtlpExporterOptions exporter, string signalPath)
     {
-        exporter.Endpoint = new Uri(otlpEndpoint!);
+        exporter.Endpoint = SignalEndpoint(signalPath);
         exporter.Protocol = exportProtocol;
+
+        if (!string.IsNullOrWhiteSpace(otlpHeaders))
+        {
+            exporter.Headers = otlpHeaders;
+        }
     }
 
     builder.Services
@@ -184,7 +255,7 @@ try
 
             if (hasOtlp)
             {
-                tracing.AddOtlpExporter(ConfigureOtlp);
+                tracing.AddOtlpExporter(exporter => ConfigureOtlp(exporter, "v1/traces"));
             }
         })
         .WithMetrics(metrics =>
@@ -196,7 +267,7 @@ try
 
             if (hasOtlp)
             {
-                metrics.AddOtlpExporter(ConfigureOtlp);
+                metrics.AddOtlpExporter(exporter => ConfigureOtlp(exporter, "v1/metrics"));
             }
         });
 
@@ -206,7 +277,7 @@ try
         {
             options.IncludeFormattedMessage = true;
             options.IncludeScopes = true;
-            options.AddOtlpExporter(ConfigureOtlp);
+            options.AddOtlpExporter(exporter => ConfigureOtlp(exporter, "v1/logs"));
         });
     }
 
