@@ -37,6 +37,8 @@ src/ShortLink.Api/logs/
 *.db-wal
 *.sqlite
 *.sqlite3
+# 迁移项目目录名以 .sqlite 结尾，上面的通配会误伤整个项目，必须排除
+!src/ShortLink.Infrastructure.Migrations.Sqlite/
 
 ## 环境与密钥
 .env

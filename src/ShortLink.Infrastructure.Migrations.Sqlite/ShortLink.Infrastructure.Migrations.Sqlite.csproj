@@ -1,0 +1,20 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <RootNamespace>ShortLink.Infrastructure.Migrations.Sqlite</RootNamespace>
+    <AssemblyName>ShortLink.Infrastructure.Migrations.Sqlite</AssemblyName>
+    <Description>SQLite 专属迁移程序集。EF Core 迁移不区分 provider，必须按数据库分程序集，避免跨方言 DDL 混用。</Description>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\ShortLink.Infrastructure\ShortLink.Infrastructure.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.EntityFrameworkCore.Design">
+      <PrivateAssets>all</PrivateAssets>
+      <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+    </PackageReference>
+  </ItemGroup>
+
+</Project>
