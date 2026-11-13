@@ -15,11 +15,13 @@ public static class ReturnUrlGuard
         return IsUnsafe(decoded) ? "/" : returnUrl!;
     }
 
+    // 不用 Uri.TryCreate(Absolute) 判绝对地址：Unix 上 "/links" 会被解析成绝对的 file:// 路径，
+    // 把站内路径误判成站外地址（同一份代码在 Windows 上返回 false，表现为只在 CI 失败）。
+    // 真正的绝对 URI（https://、javascript: 等）首字符不是 '/'，上面的判断已经拒绝。
     private static bool IsUnsafe(string? value)
         => string.IsNullOrWhiteSpace(value)
            || value[0] != '/'
            || value.StartsWith("//", StringComparison.Ordinal)
            || value.Contains('\\', StringComparison.Ordinal)
-           || value.Any(char.IsControl)
-           || Uri.TryCreate(value, UriKind.Absolute, out _);
+           || value.Any(char.IsControl);
 }
