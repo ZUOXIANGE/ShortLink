@@ -54,7 +54,7 @@
   </ItemGroup>
   <ItemGroup Label="前端（Blazor WASM + MudBlazor）">
     <PackageVersion Include="Microsoft.AspNetCore.Components.WebAssembly" Version="10.0.15" />
-    <PackageVersion Include="Microsoft.AspNetCore.Components.WebAssembly.DevServer" Version="10.0.15" />
+    <PackageVersion Include="Microsoft.AspNetCore.Components.WebAssembly.DevServer" Version="11.0.0" />
     <PackageVersion Include="MudBlazor" Version="9.12.0" />
     <PackageVersion Include="Microsoft.AspNetCore.Components.Authorization" Version="10.0.15" />
     <!-- 二维码：纯托管实现，PngByteQRCode 不依赖 System.Drawing，可在 WASM 内运行 -->
