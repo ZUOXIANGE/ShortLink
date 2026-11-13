@@ -176,6 +176,23 @@ ShortLink__PublishTarget=kubernetes dotnet aspire publish -o artifacts/k8s
 
 越权在服务端兜底（`11003` / `40301`），前端隐藏只是避免误操作。
 
+### 界面截图
+
+用 `dotnet run --project src/ShortLink.AppHost` 起全套后，以本地账号登录截取（含演示数据），全部图片在 [`.screenshots/`](.screenshots)。
+
+| 管理后台 | 截图 | 可观测性 | 截图 |
+| --- | --- | --- | --- |
+| 登录 | [01-login.png](.screenshots/01-login.png) | Aspire 资源列表 | [17-aspire-resources.png](.screenshots/17-aspire-resources.png) |
+| 控制台 | [02-dashboard.png](.screenshots/02-dashboard.png) | Aspire api 详情 | [18-aspire-api-detail.png](.screenshots/18-aspire-api-detail.png) |
+| 短链管理 | [03-links.png](.screenshots/03-links.png) | Aspire 控制台日志 | [19-aspire-api-console.png](.screenshots/19-aspire-api-console.png) |
+| 新建短链 | [04-link-create-dialog.png](.screenshots/04-link-create-dialog.png) | Aspire 拓扑图 | [20-aspire-graph.png](.screenshots/20-aspire-graph.png) |
+| 条件路由 / A/B | [05-link-routes-dialog.png](.screenshots/05-link-routes-dialog.png) | OpenObserve 登录 | [11-openobserve-login.png](.screenshots/11-openobserve-login.png) |
+| 单链统计 | [06-link-stats.png](.screenshots/06-link-stats.png) | OpenObserve 主页 | [12-openobserve-home.png](.screenshots/12-openobserve-home.png) |
+| 域名管理 | [07-domains.png](.screenshots/07-domains.png) | 日志检索 | [13-openobserve-logs.png](.screenshots/13-openobserve-logs.png) |
+| 安全事件 | [08-security.png](.screenshots/08-security.png) | 链路追踪 | [14-openobserve-traces.png](.screenshots/14-openobserve-traces.png) |
+| 账号与角色 | [09-users.png](.screenshots/09-users.png) | 服务目录 | [15-openobserve-service-catalog.png](.screenshots/15-openobserve-service-catalog.png) |
+| API 文档（Scalar） | [10-api-scalar.png](.screenshots/10-api-scalar.png) | 指标图表 | [16-openobserve-metrics.png](.screenshots/16-openobserve-metrics.png) |
+
 ## 部署要点
 
 1. **Host 必须透传**：短链按 `Host + code` 解析，反向代理需配置 `proxy_set_header Host $host;`。
