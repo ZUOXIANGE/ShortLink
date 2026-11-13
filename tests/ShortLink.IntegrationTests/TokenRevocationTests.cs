@@ -34,21 +34,21 @@ public sealed class TokenRevocationTests(ApiFactory factory)
 
         var reset = await admin.PostAsJsonAsync(
             $"/api/v1/users/{user.Id}/reset-password",
-            new ResetPasswordRequest { NewPassword = "After123" });
-        var resetEnvelope = await reset.Content.ReadFromJsonAsync<ApiResponse<object?>>(ApiFactory.JsonOptions);
+            new ResetPasswordRequest { NewPassword = "After123" }, TestContext.Current.CancellationToken);
+        var resetEnvelope = await reset.Content.ReadFromJsonAsync<ApiResponse<object?>>(ApiFactory.JsonOptions, TestContext.Current.CancellationToken);
         Assert.Equal(BizCodes.Success, resetEnvelope!.Code);
 
         var oldClient = factory.CreateClient();
         oldClient.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", oldToken);
-        var rejected = await oldClient.GetAsync("/api/v1/links");
-        var rejectedEnvelope = await rejected.Content.ReadFromJsonAsync<ApiResponse<JsonElement>>(ApiFactory.JsonOptions);
+        var rejected = await oldClient.GetAsync("/api/v1/links", TestContext.Current.CancellationToken);
+        var rejectedEnvelope = await rejected.Content.ReadFromJsonAsync<ApiResponse<JsonElement>>(ApiFactory.JsonOptions, TestContext.Current.CancellationToken);
         Assert.Equal(BizCodes.Unauthorized, rejectedEnvelope!.Code);
 
         var newToken = await LoginAsync(factory.CreateClient(), userName, "After123");
         var newClient = factory.CreateClient();
         newClient.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", newToken);
-        var accepted = await newClient.GetAsync("/api/v1/links");
-        var acceptedEnvelope = await accepted.Content.ReadFromJsonAsync<ApiResponse<JsonElement>>(ApiFactory.JsonOptions);
+        var accepted = await newClient.GetAsync("/api/v1/links", TestContext.Current.CancellationToken);
+        var acceptedEnvelope = await accepted.Content.ReadFromJsonAsync<ApiResponse<JsonElement>>(ApiFactory.JsonOptions, TestContext.Current.CancellationToken);
         Assert.Equal(BizCodes.Success, acceptedEnvelope!.Code);
     }
 
@@ -68,9 +68,9 @@ public sealed class TokenRevocationTests(ApiFactory factory)
             var db = scope.ServiceProvider.GetRequiredService<ShortLinkDbContext>();
             var workspace = Workspace.Create("第二工作区", $"ws-{Guid.NewGuid():N}", false, DateTime.UtcNow);
             db.Workspaces.Add(workspace);
-            await db.SaveChangesAsync();
+            await db.SaveChangesAsync(TestContext.Current.CancellationToken);
             db.WorkspaceMembers.Add(WorkspaceMember.Create(workspace.Id, user.Id, UserRole.Viewer, DateTime.UtcNow));
-            await db.SaveChangesAsync();
+            await db.SaveChangesAsync(TestContext.Current.CancellationToken);
             workspaceId = workspace.Id;
         }
 
@@ -98,8 +98,8 @@ public sealed class TokenRevocationTests(ApiFactory factory)
             "Bearer",
             new JsonWebTokenHandler().CreateToken(descriptor));
 
-        var response = await client.GetAsync("/api/v1/auth/me");
-        var envelope = await response.Content.ReadFromJsonAsync<ApiResponse<UserDto>>(ApiFactory.JsonOptions);
+        var response = await client.GetAsync("/api/v1/auth/me", TestContext.Current.CancellationToken);
+        var envelope = await response.Content.ReadFromJsonAsync<ApiResponse<UserDto>>(ApiFactory.JsonOptions, TestContext.Current.CancellationToken);
 
         Assert.Equal(BizCodes.Success, envelope!.Code);
         Assert.Equal(workspaceId, envelope.Data!.WorkspaceId);
@@ -138,13 +138,13 @@ public sealed class TokenRevocationTests(ApiFactory factory)
         var client = factory.CreateClient();
         client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", legacyToken);
 
-        var response = await client.GetAsync("/api/v1/links");
-        var envelope = await response.Content.ReadFromJsonAsync<ApiResponse<JsonElement>>(ApiFactory.JsonOptions);
+        var response = await client.GetAsync("/api/v1/links", TestContext.Current.CancellationToken);
+        var envelope = await response.Content.ReadFromJsonAsync<ApiResponse<JsonElement>>(ApiFactory.JsonOptions, TestContext.Current.CancellationToken);
 
         Assert.Equal(BizCodes.Success, envelope!.Code);
     }
 
-    private async Task<ManagedUserDto> CreateUserAsync(
+    private static async Task<ManagedUserDto> CreateUserAsync(
         HttpClient admin,
         string userName,
         string password,

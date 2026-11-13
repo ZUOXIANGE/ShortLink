@@ -39,11 +39,14 @@ public static class LinkClickCappedHandler
 
         await db.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
 
-        logger.LogInformation(
-            "短链 {Code} 因点击封顶自动停用（{Clicks}/{Max}）",
-            message.Code,
-            message.ClickCount,
-            message.MaxClicks);
+        if (logger.IsEnabled(LogLevel.Information))
+        {
+            logger.LogInformation(
+                "短链 {Code} 因点击封顶自动停用（{Clicks}/{Max}）",
+                message.Code,
+                message.ClickCount,
+                message.MaxClicks);
+        }
     }
 }
 

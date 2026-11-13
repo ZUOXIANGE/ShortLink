@@ -121,14 +121,17 @@ public sealed class McpToolRunner(ICurrentUser user, ILogger<McpToolRunner> logg
 
         if (isError)
         {
-            logger.LogWarning(
-                "MCP 工具 {Tool} 失败：用户 {User}，业务码 {BizCode}，耗时 {Elapsed:F0}ms",
-                toolName,
-                user.UserName ?? "anonymous",
-                bizCode,
-                elapsedMs);
+            if (logger.IsEnabled(LogLevel.Warning))
+            {
+                logger.LogWarning(
+                    "MCP 工具 {Tool} 失败：用户 {User}，业务码 {BizCode}，耗时 {Elapsed:F0}ms",
+                    toolName,
+                    user.UserName ?? "anonymous",
+                    bizCode,
+                    elapsedMs);
+            }
         }
-        else
+        else if (logger.IsEnabled(LogLevel.Information))
         {
             logger.LogInformation(
                 "MCP 工具 {Tool} 成功：用户 {User}，耗时 {Elapsed:F0}ms",

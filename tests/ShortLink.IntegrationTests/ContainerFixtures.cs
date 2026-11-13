@@ -84,8 +84,7 @@ public sealed class MySqlHostFixture : IAsyncLifetime
             return;
         }
 
-        _container = new MySqlBuilder()
-            .WithImage("mysql:8.4")
+        _container = new MySqlBuilder("mysql:8.4")
             .WithDatabase(Database)
             .WithUsername("shortlink")
             .WithPassword(ContainerPassword)
@@ -160,8 +159,7 @@ public sealed class PostgreSqlHostFixture : IAsyncLifetime
             return;
         }
 
-        _container = new PostgreSqlBuilder()
-            .WithImage("postgres:17-alpine")
+        _container = new PostgreSqlBuilder("postgres:17-alpine")
             .WithDatabase(Database)
             .WithUsername("shortlink")
             .WithPassword(ContainerPassword)
@@ -209,8 +207,7 @@ public sealed class RedisHostFixture : IAsyncLifetime
             return;
         }
 
-        _container = new RedisBuilder()
-            .WithImage("redis:8.6")
+        _container = new RedisBuilder("redis:8.6")
             .Build();
 
         await _container.StartAsync();

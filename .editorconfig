@@ -72,6 +72,11 @@ dotnet_diagnostic.CA1848.severity = none
 dotnet_diagnostic.IDE0290.severity = none
 dotnet_diagnostic.IDE0130.severity = none
 
+# xUnit 的 [CollectionDefinition] 类按框架惯例命名为 <Name>Collection，
+# 它们不是集合类型，与 CA1711 的立意（避免把类型误认成集合）不冲突。
+[tests/**.cs]
+dotnet_diagnostic.CA1711.severity = none
+
 [**/Migrations/*.cs]
 generated_code = true
 

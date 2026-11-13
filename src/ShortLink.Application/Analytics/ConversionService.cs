@@ -105,7 +105,10 @@ public sealed class ConversionService(
         if (!added)
         {
             // 并发重复提交：唯一索引兜底，按幂等命中处理。
-            logger.LogInformation("转化回调并发重复，已按幂等处理：link={LinkId} event={EventId}", link.Id, request.EventId);
+            if (logger.IsEnabled(LogLevel.Information))
+            {
+                logger.LogInformation("转化回调并发重复，已按幂等处理：link={LinkId} event={EventId}", link.Id, request.EventId);
+            }
         }
 
         var total = await conversions.GetLinkTotalAsync(link.Id, cancellationToken).ConfigureAwait(false);

@@ -1,3 +1,4 @@
+using System.Globalization;
 using System.Net;
 using System.Net.Http.Headers;
 using System.Net.Http.Json;
@@ -31,9 +32,9 @@ public sealed class PlatformEndpointTests(ApiFactory factory)
             DisplayName = "成员一号",
             Password = "Member@123456",
             Role = "member",
-        });
+        }, TestContext.Current.CancellationToken);
 
-        var created = await create.Content.ReadFromJsonAsync<ApiResponse<ManagedUserDto>>(ApiFactory.JsonOptions);
+        var created = await create.Content.ReadFromJsonAsync<ApiResponse<ManagedUserDto>>(ApiFactory.JsonOptions, TestContext.Current.CancellationToken);
         Assert.Equal(BizCodes.Success, created!.Code);
         Assert.Equal("member", created.Data!.Role);
         Assert.Equal("成员", created.Data.RoleName);
@@ -43,15 +44,15 @@ public sealed class PlatformEndpointTests(ApiFactory factory)
             "Bearer",
             await LoginAsync(member, "member01", "Member@123456"));
 
-        var forbidden = await member.GetAsync("/api/v1/users");
-        var envelope = await forbidden.Content.ReadFromJsonAsync<ApiResponse<JsonElement>>(ApiFactory.JsonOptions);
+        var forbidden = await member.GetAsync("/api/v1/users", TestContext.Current.CancellationToken);
+        var envelope = await forbidden.Content.ReadFromJsonAsync<ApiResponse<JsonElement>>(ApiFactory.JsonOptions, TestContext.Current.CancellationToken);
 
         Assert.Equal(HttpStatusCode.OK, forbidden.StatusCode);
         Assert.Equal(BizCodes.Forbidden, envelope!.Code);
 
         // 成员仍可读短链列表，说明「只读管理接口」而非整体拒绝。
-        var links = await member.GetAsync("/api/v1/links");
-        var linksEnvelope = await links.Content.ReadFromJsonAsync<ApiResponse<JsonElement>>(ApiFactory.JsonOptions);
+        var links = await member.GetAsync("/api/v1/links", TestContext.Current.CancellationToken);
+        var linksEnvelope = await links.Content.ReadFromJsonAsync<ApiResponse<JsonElement>>(ApiFactory.JsonOptions, TestContext.Current.CancellationToken);
         Assert.Equal(BizCodes.Success, linksEnvelope!.Code);
     }
 
@@ -68,9 +69,9 @@ public sealed class PlatformEndpointTests(ApiFactory factory)
         {
             Action = BatchActions.Disable,
             Ids = [first, second, 999_999],
-        });
+        }, TestContext.Current.CancellationToken);
 
-        var envelope = await response.Content.ReadFromJsonAsync<ApiResponse<BatchResult>>(ApiFactory.JsonOptions);
+        var envelope = await response.Content.ReadFromJsonAsync<ApiResponse<BatchResult>>(ApiFactory.JsonOptions, TestContext.Current.CancellationToken);
 
         Assert.Equal(BizCodes.Success, envelope!.Code);
         Assert.Equal(3, envelope.Data!.Total);
@@ -92,9 +93,9 @@ public sealed class PlatformEndpointTests(ApiFactory factory)
         {
             Action = BatchActions.Enable,
             Ids = Enumerable.Range(1, 501).Select(i => (long)i).ToList(),
-        });
+        }, TestContext.Current.CancellationToken);
 
-        var envelope = await response.Content.ReadFromJsonAsync<ApiResponse<BatchResult>>(ApiFactory.JsonOptions);
+        var envelope = await response.Content.ReadFromJsonAsync<ApiResponse<BatchResult>>(ApiFactory.JsonOptions, TestContext.Current.CancellationToken);
 
         Assert.Equal(BizCodes.InvalidArgument, envelope!.Code);
         Assert.NotNull(envelope.Errors);
@@ -108,9 +109,9 @@ public sealed class PlatformEndpointTests(ApiFactory factory)
 
         await CreateLinkAsync(client, "csv0001");
 
-        var response = await client.GetAsync("/api/v1/links/export?pageSize=50");
+        var response = await client.GetAsync("/api/v1/links/export?pageSize=50", TestContext.Current.CancellationToken);
 
-        var bytes = await response.Content.ReadAsByteArrayAsync();
+        var bytes = await response.Content.ReadAsByteArrayAsync(TestContext.Current.CancellationToken);
         Assert.True(
             string.Equals("text/csv", response.Content.Headers.ContentType?.MediaType, StringComparison.Ordinal),
             $"期望 text/csv，实际 {response.Content.Headers.ContentType?.MediaType}；响应体：{Encoding.UTF8.GetString(bytes)}");
@@ -156,20 +157,20 @@ public sealed class PlatformEndpointTests(ApiFactory factory)
                     TargetUrl = "https://global.example.com/landing",
                 },
             ],
-        });
+        }, TestContext.Current.CancellationToken);
 
-        var saved = await save.Content.ReadFromJsonAsync<ApiResponse<IReadOnlyList<LinkRouteDto>>>(ApiFactory.JsonOptions);
+        var saved = await save.Content.ReadFromJsonAsync<ApiResponse<IReadOnlyList<LinkRouteDto>>>(ApiFactory.JsonOptions, TestContext.Current.CancellationToken);
         Assert.Equal(BizCodes.Success, saved!.Code);
         Assert.Equal(2, saved.Data!.Count);
 
         using var cnRequest = new HttpRequestMessage(HttpMethod.Get, "/route01");
         cnRequest.Headers.Add("CF-IPCountry", "CN");
-        var cnRedirect = await client.SendAsync(cnRequest);
+        var cnRedirect = await client.SendAsync(cnRequest, TestContext.Current.CancellationToken);
 
         Assert.Equal(HttpStatusCode.Redirect, cnRedirect.StatusCode);
         Assert.Equal("https://cn.example.com/landing", cnRedirect.Headers.Location!.ToString());
 
-        var globalRedirect = await client.GetAsync("/route01");
+        var globalRedirect = await client.GetAsync("/route01", TestContext.Current.CancellationToken);
         Assert.Equal("https://global.example.com/landing", globalRedirect.Headers.Location!.ToString());
 
         // 规则测试接口应按 1000 次模拟给出分流比例。
@@ -177,9 +178,9 @@ public sealed class PlatformEndpointTests(ApiFactory factory)
         {
             Country = "CN",
             Repeat = 1000,
-        });
+        }, TestContext.Current.CancellationToken);
 
-        var tested = await test.Content.ReadFromJsonAsync<ApiResponse<RouteTestResult>>(ApiFactory.JsonOptions);
+        var tested = await test.Content.ReadFromJsonAsync<ApiResponse<RouteTestResult>>(ApiFactory.JsonOptions, TestContext.Current.CancellationToken);
         Assert.Equal(BizCodes.Success, tested!.Code);
         Assert.Equal("国内", tested.Data!.RouteName);
         Assert.NotEmpty(tested.Data.Distribution);
@@ -199,12 +200,12 @@ public sealed class PlatformEndpointTests(ApiFactory factory)
             TargetUrl = "https://example.com/cap",
             Code = "cap001",
             MaxClicks = 1,
-        });
+        }, TestContext.Current.CancellationToken);
 
-        var created = await create.Content.ReadFromJsonAsync<ApiResponse<LinkDto>>(ApiFactory.JsonOptions);
+        var created = await create.Content.ReadFromJsonAsync<ApiResponse<LinkDto>>(ApiFactory.JsonOptions, TestContext.Current.CancellationToken);
         Assert.Equal(BizCodes.Success, created!.Code);
 
-        var first = await client.GetAsync("/cap001");
+        var first = await client.GetAsync("/cap001", TestContext.Current.CancellationToken);
         Assert.Equal(HttpStatusCode.Redirect, first.StatusCode);
 
         // 点击落库是消息驱动的批处理（聚合窗口默认 500ms）。
@@ -228,17 +229,17 @@ public sealed class PlatformEndpointTests(ApiFactory factory)
 
         var linkId = await CreateLinkAsync(client, "stat001");
 
-        var redirect = await client.GetAsync("/stat001");
+        var redirect = await client.GetAsync("/stat001", TestContext.Current.CancellationToken);
         Assert.Equal(HttpStatusCode.Redirect, redirect.StatusCode);
 
         await WaitUntilAsync(
             async () => (await GetStatsAsync(client, linkId))?.TotalClicks >= 1,
             "点击应在聚合窗口后被写入并能被统计到");
 
-        var statsResponse = await client.GetAsync($"/api/v1/links/{linkId}/stats?days=7");
+        var statsResponse = await client.GetAsync($"/api/v1/links/{linkId}/stats?days=7", TestContext.Current.CancellationToken);
         Assert.Equal(HttpStatusCode.OK, statsResponse.StatusCode);
 
-        var stats = await statsResponse.Content.ReadFromJsonAsync<ApiResponse<LinkStatsDto>>(ApiFactory.JsonOptions);
+        var stats = await statsResponse.Content.ReadFromJsonAsync<ApiResponse<LinkStatsDto>>(ApiFactory.JsonOptions, TestContext.Current.CancellationToken);
         Assert.Equal(BizCodes.Success, stats!.Code);
         Assert.True(stats.Data!.TotalClicks >= 1);
         Assert.Contains(stats.Data.Variants, v => v.Name == "兜底地址" && v.Clicks >= 1);
@@ -260,7 +261,7 @@ public sealed class PlatformEndpointTests(ApiFactory factory)
         const int clicks = 8;
         for (var index = 0; index < clicks; index++)
         {
-            var redirect = await client.GetAsync("/burst01");
+            var redirect = await client.GetAsync("/burst01", TestContext.Current.CancellationToken);
             Assert.Equal(HttpStatusCode.Redirect, redirect.StatusCode);
         }
 
@@ -314,8 +315,8 @@ public sealed class PlatformEndpointTests(ApiFactory factory)
 
         var linkId = await CreateLinkAsync(client, "conv001");
 
-        var keyResponse = await client.GetAsync($"/api/v1/links/{linkId}/conversion-key");
-        var key = await keyResponse.Content.ReadFromJsonAsync<ApiResponse<ConversionKeyDto>>(ApiFactory.JsonOptions);
+        var keyResponse = await client.GetAsync($"/api/v1/links/{linkId}/conversion-key", TestContext.Current.CancellationToken);
+        var key = await keyResponse.Content.ReadFromJsonAsync<ApiResponse<ConversionKeyDto>>(ApiFactory.JsonOptions, TestContext.Current.CancellationToken);
         Assert.Equal(BizCodes.Success, key!.Code);
         Assert.Equal("HMAC-SHA256", key.Data!.Algorithm);
 
@@ -330,17 +331,17 @@ public sealed class PlatformEndpointTests(ApiFactory factory)
         var anonymous = factory.CreateClient();
 
         var bad = await PostSignedAsync(anonymous, body, key.Data.Secret, validSignature: false);
-        var badEnvelope = await bad.Content.ReadFromJsonAsync<ApiResponse<ConversionResultDto>>(ApiFactory.JsonOptions);
+        var badEnvelope = await bad.Content.ReadFromJsonAsync<ApiResponse<ConversionResultDto>>(ApiFactory.JsonOptions, TestContext.Current.CancellationToken);
         Assert.Equal(BizCodes.ConversionSignatureInvalid, badEnvelope!.Code);
 
         var first = await PostSignedAsync(anonymous, body, key.Data.Secret, validSignature: true);
-        var firstEnvelope = await first.Content.ReadFromJsonAsync<ApiResponse<ConversionResultDto>>(ApiFactory.JsonOptions);
+        var firstEnvelope = await first.Content.ReadFromJsonAsync<ApiResponse<ConversionResultDto>>(ApiFactory.JsonOptions, TestContext.Current.CancellationToken);
         Assert.Equal(BizCodes.Success, firstEnvelope!.Code);
         Assert.False(firstEnvelope.Data!.Duplicate);
         Assert.Equal(1, firstEnvelope.Data.TotalConversions);
 
         var replay = await PostSignedAsync(anonymous, body, key.Data.Secret, validSignature: true);
-        var replayEnvelope = await replay.Content.ReadFromJsonAsync<ApiResponse<ConversionResultDto>>(ApiFactory.JsonOptions);
+        var replayEnvelope = await replay.Content.ReadFromJsonAsync<ApiResponse<ConversionResultDto>>(ApiFactory.JsonOptions, TestContext.Current.CancellationToken);
         Assert.Equal(BizCodes.Success, replayEnvelope!.Code);
         Assert.True(replayEnvelope.Data!.Duplicate);
         Assert.Equal(1, replayEnvelope.Data.TotalConversions);
@@ -359,13 +360,13 @@ public sealed class PlatformEndpointTests(ApiFactory factory)
         {
             Code = "abuse01",
             Reason = "该链接跳转到仿冒的支付页面，请尽快处理。",
-        });
+        }, TestContext.Current.CancellationToken);
 
-        var envelope = await report.Content.ReadFromJsonAsync<ApiResponse<object?>>(ApiFactory.JsonOptions);
+        var envelope = await report.Content.ReadFromJsonAsync<ApiResponse<object?>>(ApiFactory.JsonOptions, TestContext.Current.CancellationToken);
         Assert.Equal(BizCodes.Success, envelope!.Code);
 
-        var events = await client.GetAsync("/api/v1/security/events?type=abuse_reported&days=7");
-        var page = await events.Content.ReadFromJsonAsync<ApiResponse<PagedResult<ShortLink.Contracts.Security.SecurityEventDto>>>(ApiFactory.JsonOptions);
+        var events = await client.GetAsync("/api/v1/security/events?type=abuse_reported&days=7", TestContext.Current.CancellationToken);
+        var page = await events.Content.ReadFromJsonAsync<ApiResponse<PagedResult<ShortLink.Contracts.Security.SecurityEventDto>>>(ApiFactory.JsonOptions, TestContext.Current.CancellationToken);
 
         Assert.Equal(BizCodes.Success, page!.Code);
         Assert.Contains(page.Data!.Items, e => e.Code == "abuse01");
@@ -377,7 +378,7 @@ public sealed class PlatformEndpointTests(ApiFactory factory)
         string secret,
         bool validSignature)
     {
-        var timestamp = DateTimeOffset.UtcNow.ToUnixTimeSeconds().ToString();
+        var timestamp = DateTimeOffset.UtcNow.ToUnixTimeSeconds().ToString(CultureInfo.InvariantCulture);
         var payload = $"{timestamp}.{body}";
         var signature = Convert.ToHexString(
             HMACSHA256.HashData(Encoding.UTF8.GetBytes(secret), Encoding.UTF8.GetBytes(payload))).ToLowerInvariant();

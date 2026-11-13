@@ -121,7 +121,7 @@ public sealed class AnalyticsTools(AnalyticsService analytics, LinkService links
             },
             cancellationToken);
 
-    private static IReadOnlyList<MetricSlice> TopOf(IReadOnlyList<DimensionItemDto> items, int take)
+    private static List<MetricSlice> TopOf(IReadOnlyList<DimensionItemDto> items, int take)
         => items.Take(take).Select(MetricSlice.From).ToList();
 
     private async Task<long> ResolveLinkIdAsync(long? linkId, string? shortUrl, CancellationToken cancellationToken)

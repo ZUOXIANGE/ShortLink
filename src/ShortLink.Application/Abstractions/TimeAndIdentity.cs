@@ -32,9 +32,9 @@ public interface IStatisticsCalendar
     DateOnly ToDate(DateTime utcInstant);
 
     /// <summary>统计自然日的起点，转换为 UTC 瞬时，供点击与转化共用同一时间窗口。</summary>
-    DateTime ToUtcStart(DateOnly date)
+    DateTime ToUtcStart(DateOnly dateOnly)
         => TimeZoneInfo.ConvertTimeToUtc(
-            date.ToDateTime(TimeOnly.MinValue),
+            dateOnly.ToDateTime(TimeOnly.MinValue),
             TimeZoneInfo.FindSystemTimeZoneById(TimeZoneId));
 }
 

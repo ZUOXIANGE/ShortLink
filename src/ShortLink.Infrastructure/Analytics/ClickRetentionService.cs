@@ -44,10 +44,13 @@ public sealed class ClickRetentionService(
             return;
         }
 
-        logger.LogInformation(
-            "点击明细保留策略已启用：保留 {Days} 天，每天 {Hour}:00 UTC 执行",
-            settings.ClickRetentionDays,
-            settings.RunAtHourUtc);
+        if (logger.IsEnabled(LogLevel.Information))
+        {
+            logger.LogInformation(
+                "点击明细保留策略已启用：保留 {Days} 天，每天 {Hour}:00 UTC 执行",
+                settings.ClickRetentionDays,
+                settings.RunAtHourUtc);
+        }
 
         try
         {
@@ -212,9 +215,12 @@ public sealed class ClickRetentionService(
             completed = true;
             if (total > 0)
             {
-                logger.LogInformation("点击明细清理完成：删除 {Rows} 行（早于 {Cutoff:yyyy-MM-dd}）", total, cutoff);
+                if (logger.IsEnabled(LogLevel.Information))
+                {
+                    logger.LogInformation("点击明细清理完成：删除 {Rows} 行（早于 {Cutoff:yyyy-MM-dd}）", total, cutoff);
+                }
             }
-            else
+            else if (logger.IsEnabled(LogLevel.Debug))
             {
                 logger.LogDebug("点击明细清理完成：没有需要清理的数据（早于 {Cutoff:yyyy-MM-dd}）", cutoff);
             }

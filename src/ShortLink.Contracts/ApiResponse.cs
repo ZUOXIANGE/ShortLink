@@ -11,16 +11,7 @@ public sealed record ApiResponse<T>(
     string Msg,
     T? Data,
     [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
-    IReadOnlyDictionary<string, string[]>? Errors = null)
-{
-    public static ApiResponse<T> Ok(T? data) => new(BizCodes.Success, "success", data);
-
-    public static ApiResponse<T> Fail(
-        int code,
-        string msg,
-        IReadOnlyDictionary<string, string[]>? errors = null)
-        => new(code, msg, default, errors);
-}
+    IReadOnlyDictionary<string, string[]>? Errors = null);
 
 /// <summary>非泛型快捷入口，供异常处理器、中间件等无载荷场景使用。</summary>
 public static class ApiResponse
@@ -28,7 +19,7 @@ public static class ApiResponse
     public static ApiResponse<object?> Ok() => new(BizCodes.Success, "success", null);
 
     /// <summary>带载荷的成功响应，省去显式写泛型参数。</summary>
-    public static ApiResponse<T> Ok<T>(T data) => ApiResponse<T>.Ok(data);
+    public static ApiResponse<T> Ok<T>(T data) => new(BizCodes.Success, "success", data);
 
     public static ApiResponse<object?> Fail(
         int code,
@@ -40,5 +31,5 @@ public static class ApiResponse
         int code,
         string msg,
         IReadOnlyDictionary<string, string[]>? errors = null)
-        => ApiResponse<T>.Fail(code, msg, errors);
+        => new(code, msg, default, errors);
 }

@@ -1,4 +1,3 @@
-using Xunit;
 using System.Net;
 using System.Net.Http.Json;
 using System.Text.Json;
@@ -9,6 +8,7 @@ using Microsoft.Extensions.Hosting;
 using ShortLink.Contracts;
 using ShortLink.Contracts.Auth;
 using ShortLink.Contracts.Links;
+using Xunit;
 
 namespace ShortLink.IntegrationTests;
 
@@ -91,11 +91,11 @@ public sealed class ApiEndpointTests(ApiFactory factory)
     {
         var client = factory.CreateClient();
 
-        var response = await client.GetAsync("/api/v1/links");
+        var response = await client.GetAsync("/api/v1/links", TestContext.Current.CancellationToken);
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
 
-        var envelope = await response.Content.ReadFromJsonAsync<ApiResponse<JsonElement>>(ApiFactory.JsonOptions);
+        var envelope = await response.Content.ReadFromJsonAsync<ApiResponse<JsonElement>>(ApiFactory.JsonOptions, TestContext.Current.CancellationToken);
         Assert.NotNull(envelope);
         Assert.Equal(BizCodes.Unauthorized, envelope!.Code);
         Assert.Equal(JsonValueKind.Null, envelope.Data.ValueKind);
@@ -110,9 +110,9 @@ public sealed class ApiEndpointTests(ApiFactory factory)
         {
             UserName = "admin",
             Password = "Admin@123456",
-        });
+        }, TestContext.Current.CancellationToken);
 
-        var envelope = await response.Content.ReadFromJsonAsync<ApiResponse<LoginResponse>>(ApiFactory.JsonOptions);
+        var envelope = await response.Content.ReadFromJsonAsync<ApiResponse<LoginResponse>>(ApiFactory.JsonOptions, TestContext.Current.CancellationToken);
 
         Assert.NotNull(envelope);
         Assert.Equal(BizCodes.Success, envelope!.Code);
@@ -130,9 +130,9 @@ public sealed class ApiEndpointTests(ApiFactory factory)
         {
             UserName = "admin",
             Password = "wrong-password",
-        });
+        }, TestContext.Current.CancellationToken);
 
-        var envelope = await response.Content.ReadFromJsonAsync<ApiResponse<LoginResponse>>(ApiFactory.JsonOptions);
+        var envelope = await response.Content.ReadFromJsonAsync<ApiResponse<LoginResponse>>(ApiFactory.JsonOptions, TestContext.Current.CancellationToken);
 
         Assert.Equal(BizCodes.InvalidCredentials, envelope!.Code);
         Assert.Null(envelope.Data);
@@ -151,13 +151,13 @@ public sealed class ApiEndpointTests(ApiFactory factory)
             Code = "go2026",
             Title = "示例链接",
             RedirectType = 302,
-        });
+        }, TestContext.Current.CancellationToken);
 
-        var created = await createResponse.Content.ReadFromJsonAsync<ApiResponse<LinkDto>>(ApiFactory.JsonOptions);
+        var created = await createResponse.Content.ReadFromJsonAsync<ApiResponse<LinkDto>>(ApiFactory.JsonOptions, TestContext.Current.CancellationToken);
         Assert.Equal(BizCodes.Success, created!.Code);
         Assert.Equal("go2026", created.Data!.Code);
 
-        var redirect = await client.GetAsync("/go2026");
+        var redirect = await client.GetAsync("/go2026", TestContext.Current.CancellationToken);
         Assert.Equal(HttpStatusCode.Redirect, redirect.StatusCode);
         Assert.Equal("https://example.com/landing", redirect.Headers.Location!.ToString());
     }
@@ -173,9 +173,9 @@ public sealed class ApiEndpointTests(ApiFactory factory)
         {
             TargetUrl = "javascript:alert(1)",
             Code = "bad001",
-        });
+        }, TestContext.Current.CancellationToken);
 
-        var envelope = await response.Content.ReadFromJsonAsync<ApiResponse<LinkDto>>(ApiFactory.JsonOptions);
+        var envelope = await response.Content.ReadFromJsonAsync<ApiResponse<LinkDto>>(ApiFactory.JsonOptions, TestContext.Current.CancellationToken);
 
         Assert.Equal(BizCodes.InvalidArgument, envelope!.Code);
         Assert.NotNull(envelope.Errors);
@@ -187,7 +187,7 @@ public sealed class ApiEndpointTests(ApiFactory factory)
     {
         var client = factory.CreateClient(new WebApplicationFactoryClientOptions { AllowAutoRedirect = false });
 
-        var response = await client.GetAsync("/nope123");
+        var response = await client.GetAsync("/nope123", TestContext.Current.CancellationToken);
 
         Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
         Assert.Contains("text/html", response.Content.Headers.ContentType!.MediaType!);

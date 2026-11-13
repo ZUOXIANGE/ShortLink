@@ -244,7 +244,7 @@ public sealed class AnalyticsRepository(ShortLinkDbContext db) : IAnalyticsRepos
     }
 
     /// <summary>Referer 是完整 URL，视图按来源主机聚合更直观。</summary>
-    private static IReadOnlyList<DimensionItemDto> NormalizeReferers(IReadOnlyList<DimensionItemDto> referers)
+    private static List<DimensionItemDto> NormalizeReferers(IReadOnlyList<DimensionItemDto> referers)
         => referers
             .Select(r => new DimensionItemDto(NormalizeRefererHost(r.Name), r.Clicks))
             .GroupBy(r => r.Name, StringComparer.OrdinalIgnoreCase)

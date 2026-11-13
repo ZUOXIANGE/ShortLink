@@ -31,7 +31,7 @@ public sealed class MySqlSmokeTests(MySqlHostFixture fixture)
 
         var linkId = await SmokeApi.CreateLinkAsync(client, "itmysql", TargetUrl);
 
-        var redirect = await client.GetAsync("/itmysql");
+        var redirect = await client.GetAsync("/itmysql", TestContext.Current.CancellationToken);
         Assert.Equal(HttpStatusCode.Redirect, redirect.StatusCode);
         Assert.Contains(TargetUrl, redirect.Headers.Location!.ToString(), StringComparison.Ordinal);
 
@@ -48,17 +48,17 @@ public sealed class MySqlSmokeTests(MySqlHostFixture fixture)
 
         using var client = SmokeApi.CreateClient(fixture.Factory!);
 
-        var ready = await client.GetAsync("/health/ready");
+        var ready = await client.GetAsync("/health/ready", TestContext.Current.CancellationToken);
         Assert.Equal(HttpStatusCode.OK, ready.StatusCode);
 
         // 全部依赖正常时探针只回 "ready"；任一依赖失败才会输出 "database=.../cache=..." 明细。
         // 所以要同时断言「是 ready」和「没有 fail 明细」，只匹配 ready 会漏掉「刚好没检查」。
-        var body = await ready.Content.ReadAsStringAsync();
+        var body = await ready.Content.ReadAsStringAsync(TestContext.Current.CancellationToken);
         Assert.Contains("ready", body, StringComparison.OrdinalIgnoreCase);
         Assert.DoesNotContain("fail", body, StringComparison.OrdinalIgnoreCase);
 
         // 没配 Redis 时背板必须是 in-process：这个字段是「多实例下缓存不失效」的唯一可读线索。
-        using var info = JsonDocument.Parse(await client.GetStringAsync("/health/info"));
+        using var info = JsonDocument.Parse(await client.GetStringAsync("/health/info", TestContext.Current.CancellationToken));
         var backplane = info.RootElement
             .GetProperty("data").GetProperty("cache").GetProperty("backplane").GetString();
         Assert.Equal("in-process", backplane);
@@ -95,15 +95,15 @@ public sealed class RedisHostSmokeTests(RedisHostFixture fixture)
 
         using var client = fixture.Factory!.CreateClient();
 
-        var ready = await client.GetAsync("/health/ready");
+        var ready = await client.GetAsync("/health/ready", TestContext.Current.CancellationToken);
         Assert.Equal(HttpStatusCode.OK, ready.StatusCode);
 
         // DB 与缓存任一失败都会在这里露出 fail 明细——上次连接串缺 password= 就是这个症状。
-        var body = await ready.Content.ReadAsStringAsync();
+        var body = await ready.Content.ReadAsStringAsync(TestContext.Current.CancellationToken);
         Assert.Contains("ready", body, StringComparison.OrdinalIgnoreCase);
         Assert.DoesNotContain("fail", body, StringComparison.OrdinalIgnoreCase);
 
-        using var info = JsonDocument.Parse(await client.GetStringAsync("/health/info"));
+        using var info = JsonDocument.Parse(await client.GetStringAsync("/health/info", TestContext.Current.CancellationToken));
         var backplane = info.RootElement
             .GetProperty("data").GetProperty("cache").GetProperty("backplane").GetString();
         Assert.Equal("redis", backplane);

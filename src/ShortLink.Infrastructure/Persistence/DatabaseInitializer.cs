@@ -73,7 +73,10 @@ public sealed class DatabaseInitializer(
         db.Workspaces.Add(workspace);
         await db.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
 
-        logger.LogInformation("已创建默认工作区 {Workspace}", workspace.Name);
+        if (logger.IsEnabled(LogLevel.Information))
+        {
+            logger.LogInformation("已创建默认工作区 {Workspace}", workspace.Name);
+        }
         return workspace;
     }
 
@@ -90,7 +93,7 @@ public sealed class DatabaseInitializer(
             .ExecuteUpdateAsync(s => s.SetProperty(c => c.WorkspaceId, workspace.Id), cancellationToken)
             .ConfigureAwait(false);
 
-        if (links + clicks > 0)
+        if (links + clicks > 0 && logger.IsEnabled(LogLevel.Information))
         {
             logger.LogInformation(
                 "已把 {Links} 条短链与 {Clicks} 条点击明细归入默认工作区", links, clicks);
@@ -174,7 +177,10 @@ public sealed class DatabaseInitializer(
         }
 
         await db.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
-        logger.LogInformation("已为 {Count} 个历史账号补齐工作区成员记录", users.Count);
+        if (logger.IsEnabled(LogLevel.Information))
+        {
+            logger.LogInformation("已为 {Count} 个历史账号补齐工作区成员记录", users.Count);
+        }
     }
 
     private async Task<IAsyncDisposable> AcquireInitializationLockAsync(CancellationToken cancellationToken)

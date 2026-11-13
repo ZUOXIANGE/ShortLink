@@ -41,8 +41,8 @@ public sealed class ShortLinkDbContext(DbContextOptions<ShortLinkDbContext> opti
         // MySQL 默认 utf8mb4 排序规则通常忽略大小写；短码与分支标识必须与 .NET/其他 provider 一样区分大小写。
         if (Database.IsMySql())
         {
-            modelBuilder.Entity<Link>().Property(link => link.Code).HasCollation("utf8mb4_bin");
-            modelBuilder.Entity<LinkRoute>().Property(route => route.Name).HasCollation("utf8mb4_bin");
+            modelBuilder.Entity<Link>().Property(link => link.Code).UseCollation("utf8mb4_bin");
+            modelBuilder.Entity<LinkRoute>().Property(route => route.Name).UseCollation("utf8mb4_bin");
         }
 
         base.OnModelCreating(modelBuilder);

@@ -1,10 +1,11 @@
+using System.Globalization;
 using System.Net;
 using System.Text.Json;
+using System.Threading.RateLimiting;
 using Asp.Versioning;
 using Microsoft.AspNetCore.Diagnostics;
 using Microsoft.AspNetCore.HttpOverrides;
 using Microsoft.AspNetCore.RateLimiting;
-using System.Threading.RateLimiting;
 using Microsoft.EntityFrameworkCore;
 using ModelContextProtocol.AspNetCore;
 using OpenTelemetry.Exporter;
@@ -28,7 +29,7 @@ using ShortLink.Mcp;
 using ShortLink.Mcp.Diagnostics;
 
 Log.Logger = new LoggerConfiguration()
-    .WriteTo.Console()
+    .WriteTo.Console(formatProvider: CultureInfo.InvariantCulture)
     .CreateBootstrapLogger();
 
 try
@@ -42,6 +43,7 @@ try
         .Enrich.FromLogContext()
         .Enrich.WithProperty("service.name", "shortlink-api")
         .WriteTo.Console(
+            formatProvider: CultureInfo.InvariantCulture,
             outputTemplate: "[{Timestamp:HH:mm:ss} {Level:u3}] {Message:lj} {Properties:j}{NewLine}{Exception}"));
 
     // ── 分层注册 ─────────────────────────────────────────────

@@ -74,10 +74,12 @@ public sealed class LinkService(
         var link = await LoadVisibleAsync(id, cancellationToken).ConfigureAwait(false);
         var domain = await domains.FindByIdAsync(link.DomainId, cancellationToken).ConfigureAwait(false);
         var routeList = await routes.ListByLinkAsync(link.Id, cancellationToken).ConfigureAwait(false);
-        var creator = link.CreatedByUserId is { } creatorId
-            ? (await users.ListAsync([creatorId], cancellationToken).ConfigureAwait(false))
-                .FirstOrDefault()?.DisplayName
-            : null;
+        string? creator = null;
+        if (link.CreatedByUserId is { } creatorId)
+        {
+            var creators = await users.ListAsync([creatorId], cancellationToken).ConfigureAwait(false);
+            creator = creators.Count > 0 ? creators[0].DisplayName : null;
+        }
 
         return link.ToDto(domain, routeList.Count, creator);
     }

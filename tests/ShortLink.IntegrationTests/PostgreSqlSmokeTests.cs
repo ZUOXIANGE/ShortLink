@@ -31,7 +31,7 @@ public sealed class PostgreSqlSmokeTests(PostgreSqlHostFixture fixture)
 
         var linkId = await SmokeApi.CreateLinkAsync(client, "itpgsql", TargetUrl);
 
-        var redirect = await client.GetAsync("/itpgsql");
+        var redirect = await client.GetAsync("/itpgsql", TestContext.Current.CancellationToken);
         Assert.Equal(HttpStatusCode.Redirect, redirect.StatusCode);
         Assert.Contains(TargetUrl, redirect.Headers.Location!.ToString(), StringComparison.Ordinal);
 
@@ -47,14 +47,14 @@ public sealed class PostgreSqlSmokeTests(PostgreSqlHostFixture fixture)
 
         using var client = SmokeApi.CreateClient(fixture.Factory!);
 
-        var ready = await client.GetAsync("/health/ready");
+        var ready = await client.GetAsync("/health/ready", TestContext.Current.CancellationToken);
         Assert.Equal(HttpStatusCode.OK, ready.StatusCode);
 
-        var body = await ready.Content.ReadAsStringAsync();
+        var body = await ready.Content.ReadAsStringAsync(TestContext.Current.CancellationToken);
         Assert.Contains("ready", body, StringComparison.OrdinalIgnoreCase);
         Assert.DoesNotContain("fail", body, StringComparison.OrdinalIgnoreCase);
 
-        using var info = JsonDocument.Parse(await client.GetStringAsync("/health/info"));
+        using var info = JsonDocument.Parse(await client.GetStringAsync("/health/info", TestContext.Current.CancellationToken));
         var backplane = info.RootElement
             .GetProperty("data").GetProperty("cache").GetProperty("backplane").GetString();
         Assert.Equal("in-process", backplane);

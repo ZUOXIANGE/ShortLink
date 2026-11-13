@@ -30,10 +30,10 @@ public sealed class DatabaseInitializerConcurrencyTests
                 second.InitializeAsync(TestContext.Current.CancellationToken));
 
             await using var verification = CreateContext(connectionString);
-            Assert.Equal(1, await verification.Workspaces.CountAsync());
-            Assert.Equal(1, await verification.Users.CountAsync());
-            Assert.Equal(1, await verification.WorkspaceMembers.CountAsync());
-            Assert.Equal(1, await verification.Domains.CountAsync());
+            Assert.Equal(1, await verification.Workspaces.CountAsync(TestContext.Current.CancellationToken));
+            Assert.Equal(1, await verification.Users.CountAsync(TestContext.Current.CancellationToken));
+            Assert.Equal(1, await verification.WorkspaceMembers.CountAsync(TestContext.Current.CancellationToken));
+            Assert.Equal(1, await verification.Domains.CountAsync(TestContext.Current.CancellationToken));
         }
         finally
         {

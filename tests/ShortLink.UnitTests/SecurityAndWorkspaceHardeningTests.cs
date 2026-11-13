@@ -72,14 +72,14 @@ public sealed class TokenSecurityTests
         var workspace = Workspace.Create("一", "one", true, Now);
         var otherWorkspace = Workspace.Create("二", "two", false, Now);
         db.Workspaces.AddRange(workspace, otherWorkspace);
-        await db.SaveChangesAsync();
+        await db.SaveChangesAsync(TestContext.Current.CancellationToken);
 
         var user = User.Create("member", "成员", "hash", UserRole.Member, Now);
         db.Users.Add(user);
-        await db.SaveChangesAsync();
+        await db.SaveChangesAsync(TestContext.Current.CancellationToken);
         var member = WorkspaceMember.Create(workspace.Id, user.Id, UserRole.Member, Now);
         db.WorkspaceMembers.Add(member);
-        await db.SaveChangesAsync();
+        await db.SaveChangesAsync(TestContext.Current.CancellationToken);
 
         var validator = new TokenValidator(new UserRepository(db), new WorkspaceRepository(db));
 
@@ -91,7 +91,7 @@ public sealed class TokenSecurityTests
 
         user.ChangeRole(UserRole.Admin);
         member.ChangeRole(UserRole.Admin);
-        await db.SaveChangesAsync();
+        await db.SaveChangesAsync(TestContext.Current.CancellationToken);
 
         Assert.Null(await validator.ValidateAsync(user.Id, workspace.Id, 0, TestContext.Current.CancellationToken));
         Assert.Equal(
@@ -99,12 +99,12 @@ public sealed class TokenSecurityTests
             await validator.ValidateAsync(user.Id, workspace.Id, 1, TestContext.Current.CancellationToken));
 
         user.Disable();
-        await db.SaveChangesAsync();
+        await db.SaveChangesAsync(TestContext.Current.CancellationToken);
         Assert.Null(await validator.ValidateAsync(user.Id, workspace.Id, 2, TestContext.Current.CancellationToken));
 
         user.Enable();
         db.WorkspaceMembers.Remove(member);
-        await db.SaveChangesAsync();
+        await db.SaveChangesAsync(TestContext.Current.CancellationToken);
         Assert.Null(await validator.ValidateAsync(user.Id, workspace.Id, 2, TestContext.Current.CancellationToken));
     }
 
@@ -202,12 +202,14 @@ public sealed class UserWorkspaceIsolationTests
         await using var database = await SecuritySqliteDatabase.CreateAsync();
         var db = database.Context;
         var seed = await SeedAsync(db);
-        var target = await db.Users.SingleAsync(user => user.Id == seed.TargetId);
-        var membership = await db.WorkspaceMembers.SingleAsync(member =>
-            member.WorkspaceId == seed.WorkspaceId && member.UserId == seed.TargetId);
+        var target = await db.Users.SingleAsync(
+            user => user.Id == seed.TargetId, TestContext.Current.CancellationToken);
+        var membership = await db.WorkspaceMembers.SingleAsync(
+            member => member.WorkspaceId == seed.WorkspaceId && member.UserId == seed.TargetId,
+            TestContext.Current.CancellationToken);
         target.ChangeRole(UserRole.Owner);
         membership.ChangeRole(UserRole.Viewer);
-        await db.SaveChangesAsync();
+        await db.SaveChangesAsync(TestContext.Current.CancellationToken);
         var service = CreateService(db, seed);
 
         var result = await service.QueryAsync(
@@ -226,7 +228,8 @@ public sealed class UserWorkspaceIsolationTests
         var db = database.Context;
         var seed = await SeedAsync(db);
         var service = CreateService(db, seed);
-        var foreignBefore = await db.Users.AsNoTracking().SingleAsync(user => user.Id == seed.ForeignId);
+        var foreignBefore = await db.Users.AsNoTracking().SingleAsync(
+            user => user.Id == seed.ForeignId, TestContext.Current.CancellationToken);
 
         var update = await Assert.ThrowsAsync<BusinessException>(() => service.UpdateAsync(
             seed.ForeignId,
@@ -239,9 +242,11 @@ public sealed class UserWorkspaceIsolationTests
 
         Assert.Equal(BizCodes.UserNotFound, update.Code);
         Assert.Equal(BizCodes.UserNotFound, reset.Code);
-        Assert.False(await db.WorkspaceMembers.AnyAsync(member =>
-            member.WorkspaceId == seed.WorkspaceId && member.UserId == seed.ForeignId));
-        var foreignAfter = await db.Users.AsNoTracking().SingleAsync(user => user.Id == seed.ForeignId);
+        Assert.False(await db.WorkspaceMembers.AnyAsync(
+            member => member.WorkspaceId == seed.WorkspaceId && member.UserId == seed.ForeignId,
+            TestContext.Current.CancellationToken));
+        var foreignAfter = await db.Users.AsNoTracking().SingleAsync(
+            user => user.Id == seed.ForeignId, TestContext.Current.CancellationToken);
         Assert.Equal(foreignBefore.DisplayName, foreignAfter.DisplayName);
         Assert.Equal(foreignBefore.PasswordHash, foreignAfter.PasswordHash);
         Assert.Equal(foreignBefore.Role, foreignAfter.Role);
@@ -260,9 +265,11 @@ public sealed class UserWorkspaceIsolationTests
             new UpdateUserRequest { Role = "admin" },
             TestContext.Current.CancellationToken);
 
-        var target = await db.Users.SingleAsync(user => user.Id == seed.TargetId);
-        var member = await db.WorkspaceMembers.SingleAsync(item =>
-            item.WorkspaceId == seed.WorkspaceId && item.UserId == seed.TargetId);
+        var target = await db.Users.SingleAsync(
+            user => user.Id == seed.TargetId, TestContext.Current.CancellationToken);
+        var member = await db.WorkspaceMembers.SingleAsync(
+            item => item.WorkspaceId == seed.WorkspaceId && item.UserId == seed.TargetId,
+            TestContext.Current.CancellationToken);
         Assert.Equal(UserRole.Admin, target.Role);
         Assert.Equal(UserRole.Admin, member.Role);
         Assert.Equal(1, target.TokenVersion);
@@ -277,7 +284,8 @@ public sealed class UserWorkspaceIsolationTests
         var service = CreateService(db, seed);
         await db.Database.ExecuteSqlRawAsync(
             "CREATE TRIGGER reject_new_member BEFORE INSERT ON workspace_members " +
-            "BEGIN SELECT RAISE(ABORT, 'forced member failure'); END;");
+            "BEGIN SELECT RAISE(ABORT, 'forced member failure'); END;",
+            TestContext.Current.CancellationToken);
 
         await Assert.ThrowsAsync<DbUpdateException>(() => service.CreateAsync(
             new CreateUserRequest
@@ -290,8 +298,9 @@ public sealed class UserWorkspaceIsolationTests
             TestContext.Current.CancellationToken));
 
         await using var verification = database.CreateContext();
-        Assert.False(await verification.Users.AnyAsync(user => user.UserName == "atomic-user"));
-        Assert.Equal(3, await verification.WorkspaceMembers.CountAsync());
+        Assert.False(await verification.Users.AnyAsync(
+            user => user.UserName == "atomic-user", TestContext.Current.CancellationToken));
+        Assert.Equal(3, await verification.WorkspaceMembers.CountAsync(TestContext.Current.CancellationToken));
     }
 
     private static UserService CreateService(ShortLinkDbContext db, SeedData seed)

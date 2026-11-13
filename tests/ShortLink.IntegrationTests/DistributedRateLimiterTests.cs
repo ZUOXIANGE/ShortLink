@@ -28,11 +28,11 @@ public sealed class DistributedRateLimiterTests(RedisHostFixture fixture)
 
         for (var index = 0; index < 3; index++)
         {
-            using var lease = await limiter.AcquireAsync(1);
+            using var lease = await limiter.AcquireAsync(1, TestContext.Current.CancellationToken);
             Assert.True(lease.IsAcquired, $"第 {index + 1} 次应当放行（窗口额度 3）");
         }
 
-        using var rejected = await limiter.AcquireAsync(1);
+        using var rejected = await limiter.AcquireAsync(1, TestContext.Current.CancellationToken);
         Assert.False(rejected.IsAcquired, "超出窗口额度必须被拒绝");
 
         // RetryAfter 是客户端退避的唯一依据；缺了它调用方只能瞎猜。
@@ -50,7 +50,7 @@ public sealed class DistributedRateLimiterTests(RedisHostFixture fixture)
         var key = UniqueKey();
         using var limiter = CreateLimiter(redis, key, permitLimit: 5);
 
-        using (await limiter.AcquireAsync(1))
+        using (await limiter.AcquireAsync(1, TestContext.Current.CancellationToken))
         {
             // 只为把计数键创建出来
         }
@@ -107,9 +107,9 @@ public sealed class DistributedRateLimiterTests(RedisHostFixture fixture)
             window: Window);
 
         // 回落语义：既不能放行（打挂 Redis 即绕过限流），也不能全拒（把正常用户挡在外面）。
-        using var first = await limiter.AcquireAsync(1);
-        using var second = await limiter.AcquireAsync(1);
-        using var third = await limiter.AcquireAsync(1);
+        using var first = await limiter.AcquireAsync(1, TestContext.Current.CancellationToken);
+        using var second = await limiter.AcquireAsync(1, TestContext.Current.CancellationToken);
+        using var third = await limiter.AcquireAsync(1, TestContext.Current.CancellationToken);
 
         Assert.True(first.IsAcquired);
         Assert.True(second.IsAcquired);

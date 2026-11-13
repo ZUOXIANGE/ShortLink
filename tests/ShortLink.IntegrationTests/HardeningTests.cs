@@ -4,12 +4,12 @@ using System.Net.Http.Json;
 using System.Text.Json;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
+using ShortLink.Application.Abstractions;
 using ShortLink.Application.Options;
 using ShortLink.Contracts;
 using ShortLink.Contracts.Auth;
 using ShortLink.Contracts.Domains;
 using ShortLink.Contracts.Users;
-using ShortLink.Application.Abstractions;
 using ShortLink.Domain.Analytics;
 using ShortLink.Infrastructure.Analytics;
 using ShortLink.Infrastructure.Persistence;
@@ -45,8 +45,8 @@ public sealed class HardeningTests(ApiFactory factory)
             DisplayName = "只读观测员",
             Password = "Viewer@123456",
             Role = "viewer",
-        });
-        var createdEnvelope = await created.Content.ReadFromJsonAsync<ApiResponse<ManagedUserDto>>(ApiFactory.JsonOptions);
+        }, TestContext.Current.CancellationToken);
+        var createdEnvelope = await created.Content.ReadFromJsonAsync<ApiResponse<ManagedUserDto>>(ApiFactory.JsonOptions, TestContext.Current.CancellationToken);
         Assert.True(createdEnvelope!.Code == BizCodes.Success, $"创建 viewer 失败：{createdEnvelope.Msg}");
 
         var viewer = factory.CreateClient();
@@ -55,8 +55,8 @@ public sealed class HardeningTests(ApiFactory factory)
             await LoginAsync(viewer, viewerName, "Viewer@123456"));
 
         // 读：放行。
-        var list = await viewer.GetAsync("/api/v1/domains");
-        var listEnvelope = await list.Content.ReadFromJsonAsync<ApiResponse<JsonElement>>(ApiFactory.JsonOptions);
+        var list = await viewer.GetAsync("/api/v1/domains", TestContext.Current.CancellationToken);
+        var listEnvelope = await list.Content.ReadFromJsonAsync<ApiResponse<JsonElement>>(ApiFactory.JsonOptions, TestContext.Current.CancellationToken);
         Assert.True(listEnvelope!.Code == BizCodes.Success, $"viewer 应能读域名列表，实际：{listEnvelope.Msg}");
 
         // 写：必须 40301。这条是回归点——此前 viewer 能删域名。
@@ -66,12 +66,12 @@ public sealed class HardeningTests(ApiFactory factory)
             Scheme = "https",
             Name = "越权尝试",
             IsEnabled = true,
-        });
-        var forbiddenEnvelope = await forbidden.Content.ReadFromJsonAsync<ApiResponse<JsonElement>>(ApiFactory.JsonOptions);
+        }, TestContext.Current.CancellationToken);
+        var forbiddenEnvelope = await forbidden.Content.ReadFromJsonAsync<ApiResponse<JsonElement>>(ApiFactory.JsonOptions, TestContext.Current.CancellationToken);
         Assert.Equal(BizCodes.Forbidden, forbiddenEnvelope!.Code);
 
-        var delete = await viewer.DeleteAsync("/api/v1/domains/1");
-        var deleteEnvelope = await delete.Content.ReadFromJsonAsync<ApiResponse<JsonElement>>(ApiFactory.JsonOptions);
+        var delete = await viewer.DeleteAsync("/api/v1/domains/1", TestContext.Current.CancellationToken);
+        var deleteEnvelope = await delete.Content.ReadFromJsonAsync<ApiResponse<JsonElement>>(ApiFactory.JsonOptions, TestContext.Current.CancellationToken);
         Assert.Equal(BizCodes.Forbidden, deleteEnvelope!.Code);
     }
 
@@ -81,15 +81,15 @@ public sealed class HardeningTests(ApiFactory factory)
         var client = factory.CreateClient();
 
         // /health 只证明进程活着，不查任何外部依赖。
-        var live = await client.GetAsync("/health");
+        var live = await client.GetAsync("/health", TestContext.Current.CancellationToken);
         Assert.Equal(HttpStatusCode.OK, live.StatusCode);
-        Assert.Equal("ok", (await live.Content.ReadAsStringAsync()).Trim());
+        Assert.Equal("ok", (await live.Content.ReadAsStringAsync(TestContext.Current.CancellationToken)).Trim());
 
         // /health/ready 同时校验 DB 与缓存。本宿主未配置 Redis，
         // 探针应视作「不使用缓存 = 健康」，而不是误报 503。
-        var ready = await client.GetAsync("/health/ready");
+        var ready = await client.GetAsync("/health/ready", TestContext.Current.CancellationToken);
         Assert.Equal(HttpStatusCode.OK, ready.StatusCode);
-        Assert.Equal("ready", (await ready.Content.ReadAsStringAsync()).Trim());
+        Assert.Equal("ready", (await ready.Content.ReadAsStringAsync(TestContext.Current.CancellationToken)).Trim());
     }
 
     [Fact]
@@ -127,9 +127,9 @@ public sealed class HardeningTests(ApiFactory factory)
         Assert.Equal(40, purged);
 
         var db = scope.ServiceProvider.GetRequiredService<ShortLinkDbContext>();
-        var remaining = await db.ClickEvents.CountAsync(c => c.LinkId == linkId);
+        var remaining = await db.ClickEvents.CountAsync(c => c.LinkId == linkId, TestContext.Current.CancellationToken);
         Assert.Equal(5, remaining);
-        Assert.False(await db.ClickEvents.AnyAsync(c => c.LinkId == linkId && c.ClickedAtUtc < cutoff));
+        Assert.False(await db.ClickEvents.AnyAsync(c => c.LinkId == linkId && c.ClickedAtUtc < cutoff, TestContext.Current.CancellationToken));
     }
 
     [Fact]

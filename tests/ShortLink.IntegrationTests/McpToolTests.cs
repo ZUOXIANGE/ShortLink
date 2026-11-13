@@ -61,7 +61,7 @@ public sealed class McpToolTests(ApiFactory factory)
 
         var created = await client.CallToolAsync(
             "shortlink_create",
-            new Dictionary<string, object>
+            new Dictionary<string, object?>
             {
                 ["targetUrl"] = "https://example.com/mcp-e2e",
                 ["code"] = code,
@@ -78,7 +78,7 @@ public sealed class McpToolTests(ApiFactory factory)
         // 按短链地址反查：外部集成与模型手里通常只有 URL，没有数据库 ID。
         var fetched = await client.CallToolAsync(
             "shortlink_get",
-            new Dictionary<string, object> { ["shortUrl"] = shortUrl! },
+            new Dictionary<string, object?> { ["shortUrl"] = shortUrl! },
             cancellationToken: TestContext.Current.CancellationToken);
 
         Assert.NotEqual(true, fetched.IsError);
@@ -87,7 +87,7 @@ public sealed class McpToolTests(ApiFactory factory)
 
         var stats = await client.CallToolAsync(
             "shortlink_stats",
-            new Dictionary<string, object> { ["shortUrl"] = shortUrl!, ["days"] = 7 },
+            new Dictionary<string, object?> { ["shortUrl"] = shortUrl!, ["days"] = 7 },
             cancellationToken: TestContext.Current.CancellationToken);
 
         Assert.NotEqual(true, stats.IsError);
@@ -102,7 +102,7 @@ public sealed class McpToolTests(ApiFactory factory)
 
         var result = await client.CallToolAsync(
             "shortlink_get",
-            new Dictionary<string, object> { ["linkId"] = 987654321L },
+            new Dictionary<string, object?> { ["linkId"] = 987654321L },
             cancellationToken: TestContext.Current.CancellationToken);
 
         // 这是 MCP 最容易踩的坑：业务失败若被当成成功返回（HTTP 风格的信封），
@@ -125,8 +125,8 @@ public sealed class McpToolTests(ApiFactory factory)
             DisplayName = "MCP 只读账号",
             Password = "Viewer@123456",
             Role = UserRoles.Viewer,
-        });
-        var envelope = await createUser.Content.ReadFromJsonAsync<ShortLink.Contracts.ApiResponse<ShortLink.Contracts.Users.ManagedUserDto>>(ApiFactory.JsonOptions);
+        }, cancellationToken: TestContext.Current.CancellationToken);
+        var envelope = await createUser.Content.ReadFromJsonAsync<ShortLink.Contracts.ApiResponse<ShortLink.Contracts.Users.ManagedUserDto>>(ApiFactory.JsonOptions, cancellationToken: TestContext.Current.CancellationToken);
         Assert.True(envelope!.Code == ShortLink.Contracts.BizCodes.Success, envelope.Msg);
 
         await using var client = await CreateClientAsync(viewerName, "Viewer@123456");
@@ -134,14 +134,14 @@ public sealed class McpToolTests(ApiFactory factory)
         // 读：放行。
         var list = await client.CallToolAsync(
             "shortlink_list",
-            new Dictionary<string, object> { ["pageSize"] = 5 },
+            new Dictionary<string, object?> { ["pageSize"] = 5 },
             cancellationToken: TestContext.Current.CancellationToken);
         Assert.NotEqual(true, list.IsError);
 
         // 写：必须 IsError + 40301。端点只校验「已登录」，角色判定在工具层。
         var create = await client.CallToolAsync(
             "shortlink_create",
-            new Dictionary<string, object> { ["targetUrl"] = "https://example.com/should-not-exist" },
+            new Dictionary<string, object?> { ["targetUrl"] = "https://example.com/should-not-exist" },
             cancellationToken: TestContext.Current.CancellationToken);
 
         Assert.True(create.IsError is true);
@@ -155,7 +155,7 @@ public sealed class McpToolTests(ApiFactory factory)
 
         var result = await client.CallToolAsync(
             "shortlink_create",
-            new Dictionary<string, object> { ["targetUrl"] = "   " },
+            new Dictionary<string, object?> { ["targetUrl"] = "   " },
             cancellationToken: TestContext.Current.CancellationToken);
 
         Assert.True(result.IsError is true);
@@ -202,7 +202,7 @@ public sealed class McpToolTests(ApiFactory factory)
 
         var created = await client.CallToolAsync(
             "shortlink_create",
-            new Dictionary<string, object>
+            new Dictionary<string, object?>
             {
                 ["targetUrl"] = "https://example.com/mcp-toggle",
                 ["code"] = code,
@@ -219,7 +219,7 @@ public sealed class McpToolTests(ApiFactory factory)
         {
             var disable = await client.CallToolAsync(
                 "shortlink_set_enabled",
-                new Dictionary<string, object> { ["linkId"] = linkId, ["enabled"] = false },
+                new Dictionary<string, object?> { ["linkId"] = linkId, ["enabled"] = false },
                 cancellationToken: TestContext.Current.CancellationToken);
 
             Assert.NotEqual(true, disable.IsError);
@@ -229,7 +229,7 @@ public sealed class McpToolTests(ApiFactory factory)
 
         var enable = await client.CallToolAsync(
             "shortlink_set_enabled",
-            new Dictionary<string, object> { ["linkId"] = linkId, ["enabled"] = true },
+            new Dictionary<string, object?> { ["linkId"] = linkId, ["enabled"] = true },
             cancellationToken: TestContext.Current.CancellationToken);
 
         Assert.NotEqual(true, enable.IsError);

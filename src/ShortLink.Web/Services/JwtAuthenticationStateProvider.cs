@@ -1,6 +1,7 @@
+using System.Globalization;
 using System.Security.Claims;
-using Microsoft.AspNetCore.Components.Authorization;
 using Microsoft.AspNetCore.Components;
+using Microsoft.AspNetCore.Components.Authorization;
 using ShortLink.Contracts.Auth;
 
 namespace ShortLink.Web.Services;
@@ -26,7 +27,7 @@ public sealed class JwtAuthenticationStateProvider(TokenStore store, NavigationM
 
         var identity = new ClaimsIdentity(
         [
-            new Claim(ClaimTypes.NameIdentifier, store.User.Id.ToString()),
+            new Claim(ClaimTypes.NameIdentifier, store.User.Id.ToString(CultureInfo.InvariantCulture)),
             new Claim(ClaimTypes.Name, store.User.DisplayName),
             new Claim(ClaimTypes.Role, store.User.Role),
             new Claim("user_name", store.User.UserName),
