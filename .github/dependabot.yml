@@ -1,0 +1,87 @@
+version: 2
+updates:
+  # 包版本集中在根目录 Directory.Packages.props（CPM），因此 directory 指向仓库根。
+  - package-ecosystem: "nuget"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+      timezone: "Asia/Shanghai"
+    open-pull-requests-limit: 8
+    commit-message:
+      prefix: "chore(deps)"
+    labels:
+      - "dependencies"
+      - "nuget"
+    groups:
+      # Aspire 资源包与 AppHost SDK 必须同版本升级，单独成组；Kubernetes 目前只有 preview，允许组内带 preview。
+      aspire:
+        patterns:
+          - "Aspire.*"
+      # Wolverine 各持久化/传输包共用一套 outbox/inbox 表结构，版本必须一致。
+      wolverine:
+        patterns:
+          - "WolverineFx*"
+      # EF Core 与其数据库驱动互相锁版本（MySQL 走 Microting 分支，见 ADR 0004），一组成组升。
+      entity-framework:
+        patterns:
+          - "Microsoft.EntityFrameworkCore*"
+          - "Microting.*"
+          - "Npgsql.*"
+          - "MySqlConnector"
+        update-types:
+          - "minor"
+          - "patch"
+      observability:
+        patterns:
+          - "Serilog*"
+          - "OpenTelemetry*"
+      testing:
+        patterns:
+          - "xunit*"
+          - "Microsoft.NET.Test.Sdk"
+          - "Microsoft.AspNetCore.Mvc.Testing"
+          - "TngTech.*"
+          - "Testcontainers*"
+          - "Microsoft.Extensions.TimeProvider.Testing"
+      frontend:
+        patterns:
+          - "MudBlazor"
+          - "QRCoder"
+      caching-and-validation:
+        patterns:
+          - "ZiggyCreatures.*"
+          - "FluentValidation*"
+      model-context-protocol:
+        patterns:
+          - "ModelContextProtocol*"
+      # 兜底组：其余 Microsoft.Extensions.* / ASP.NET Core / Asp.Versioning 按月补丁节奏一起升。
+      # 只收 minor + patch，主版本（如 EF Core 11、net11 相关）仍单独开 PR，便于评估兼容性。
+      dotnet-platform:
+        patterns:
+          - "Microsoft.*"
+          - "System.*"
+          - "Asp.Versioning.*"
+        update-types:
+          - "minor"
+          - "patch"
+
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+      timezone: "Asia/Shanghai"
+    open-pull-requests-limit: 3
+    commit-message:
+      prefix: "chore(ci)"
+    labels:
+      - "dependencies"
+      - "github-actions"
+    groups:
+      github-actions:
+        patterns:
+          - "*"
+        update-types:
+          - "minor"
+          - "patch"
