@@ -1,0 +1,42 @@
+name: Labels
+
+# Dependabot 只会给 PR 打已存在的标签，缺失时会直接报
+# "The following labels could not be found" 并停止建 PR。
+# 标签没有声明式管理入口，这里用 gh 幂等创建（--force 会在已存在时更新）。
+on:
+  push:
+    branches: [main, master]
+    paths:
+      - ".github/workflows/labels.yml"
+  workflow_dispatch:
+
+concurrency:
+  group: labels-${{ github.workflow }}
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+  issues: write
+
+jobs:
+  sync:
+    name: Sync labels
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    env:
+      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      GH_REPO: ${{ github.repository }}
+    steps:
+      - name: Apply labels
+        run: |
+          set -euo pipefail
+
+          apply() {
+            gh label create "$1" --color "$2" --description "$3" --force >/dev/null
+            echo "ok: $1"
+          }
+
+          # 与 .github/dependabot.yml 中的 labels 保持一致。
+          apply "dependencies"   "0366D6" "依赖升级（Dependabot）"
+          apply "nuget"          "004880" "NuGet 包升级"
+          apply "github-actions" "2088FF" "GitHub Actions 工作流升级"
