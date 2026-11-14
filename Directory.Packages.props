@@ -46,10 +46,17 @@
     <PackageVersion Include="Serilog.Sinks.File" Version="7.0.0" />
     <PackageVersion Include="Serilog.Formatting.Compact" Version="3.0.0" />
     <PackageVersion Include="Serilog.Settings.Configuration" Version="10.0.1" />
+    <!-- 控制台/文件日志补 TraceId、SpanId，排查时能和 trace 对上（OTLP 那份本身已带）。 -->
+    <PackageVersion Include="Serilog.Enrichers.Span" Version="3.1.0" />
     <PackageVersion Include="OpenTelemetry.Extensions.Hosting" Version="1.21.0" />
     <PackageVersion Include="OpenTelemetry.Instrumentation.AspNetCore" Version="1.21.0" />
     <PackageVersion Include="OpenTelemetry.Instrumentation.Http" Version="1.21.0" />
     <PackageVersion Include="OpenTelemetry.Instrumentation.Runtime" Version="1.21.0" />
+    <!--
+      EF Core 只发 DiagnosticSource、不自带 ActivitySource，必须靠这个包才有 SQL span。
+      该包目前只有 beta 通道（1.21.0-beta.1 与上面的 SDK 1.21.0 同批发布）。
+    -->
+    <PackageVersion Include="OpenTelemetry.Instrumentation.EntityFrameworkCore" Version="1.21.0-beta.1" />
     <PackageVersion Include="OpenTelemetry.Exporter.OpenTelemetryProtocol" Version="1.21.0" />
   </ItemGroup>
   <ItemGroup Label="前端（Blazor WASM + MudBlazor）">
@@ -82,6 +89,7 @@
     <PackageVersion Include="WolverineFx.MySql" Version="6.64.0" />
     <PackageVersion Include="WolverineFx.Postgresql" Version="6.64.0" />
     <PackageVersion Include="WolverineFx.Kafka" Version="6.64.0" />
+    <PackageVersion Include="WolverineFx.RabbitMQ" Version="6.64.0" />
     <!--
       Wolverine 6 起核心包不再内置运行时编译器（Roslyn）。Dynamic 模式下没有它会在启动时抛异常。
       生产若要更快的冷启动，可改用 codegen 预生成（TypeLoadMode.Static），见 ADR 0008 遗留项。
@@ -97,6 +105,7 @@
     <PackageVersion Include="Aspire.Hosting.MySql" Version="13.6.5" />
     <PackageVersion Include="Aspire.Hosting.Redis" Version="13.6.5" />
     <PackageVersion Include="Aspire.Hosting.Kafka" Version="13.6.5" />
+    <PackageVersion Include="Aspire.Hosting.RabbitMQ" Version="13.6.5" />
     <!--
       发布端（publish）：`aspire publish` 用它们把资源图落成 compose / Helm chart。
       只有 Docker 有稳定版；Kubernetes 目前仍是 preview（13.6.5-preview.1.26559.7），

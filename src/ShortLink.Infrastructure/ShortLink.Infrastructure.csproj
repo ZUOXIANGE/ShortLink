@@ -17,6 +17,7 @@
     <PackageReference Include="WolverineFx.MySql" />
     <PackageReference Include="WolverineFx.Postgresql" />
     <PackageReference Include="WolverineFx.Kafka" />
+    <PackageReference Include="WolverineFx.RabbitMQ" />
     <PackageReference Include="WolverineFx.RuntimeCompilation" />
   </ItemGroup>
 

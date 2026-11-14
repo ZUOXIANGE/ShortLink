@@ -1342,10 +1342,12 @@
           "OpenTelemetry.Exporter.OpenTelemetryProtocol": "[1.21.0, )",
           "OpenTelemetry.Extensions.Hosting": "[1.21.0, )",
           "OpenTelemetry.Instrumentation.AspNetCore": "[1.21.0, )",
+          "OpenTelemetry.Instrumentation.EntityFrameworkCore": "[1.21.0-beta.1, )",
           "OpenTelemetry.Instrumentation.Http": "[1.21.0, )",
           "OpenTelemetry.Instrumentation.Runtime": "[1.21.0, )",
           "Scalar.AspNetCore": "[2.21.0, )",
           "Serilog.AspNetCore": "[10.0.0, )",
+          "Serilog.Enrichers.Span": "[3.1.0, )",
           "Serilog.Formatting.Compact": "[3.0.0, )",
           "Serilog.Settings.Configuration": "[10.0.1, )",
           "Serilog.Sinks.Console": "[6.1.1, )",
@@ -1363,7 +1365,7 @@
         "dependencies": {
           "FluentValidation": "[12.2.0, )",
           "FluentValidation.DependencyInjectionExtensions": "[12.2.0, )",
-          "Microsoft.Extensions.Logging.Abstractions": "[10.0.15, )",
+          "Microsoft.Extensions.Logging.Abstractions": "[11.0.0, )",
           "Microsoft.Extensions.Options.ConfigurationExtensions": "[11.0.0, )",
           "ShortLink.Contracts": "[0.1.0, )",
           "ShortLink.Domain": "[0.1.0, )"
@@ -1420,6 +1422,7 @@
       "shortlink.mcp": {
         "type": "Project",
         "dependencies": {
+          "Microsoft.Extensions.Logging.Abstractions": "[11.0.0, )",
           "ModelContextProtocol.AspNetCore": "[2.4.0, )",
           "ShortLink.Application": "[0.1.0, )",
           "ShortLink.Contracts": "[0.1.0, )"
@@ -1562,7 +1565,7 @@
       },
       "Microsoft.Extensions.Logging.Abstractions": {
         "type": "CentralTransitive",
-        "requested": "[10.0.15, )",
+        "requested": "[11.0.0, )",
         "resolved": "11.0.0",
         "contentHash": "MTMO2V1eT9Dm5VIpJGLNwIjAjoBErUlfuB+DEaZ0tb8J+Nf/Xlj8he5AztK9p1iOJPIyuBeOrVy2u/CSdsfzPw==",
         "dependencies": {
@@ -1651,6 +1654,17 @@
           "OpenTelemetry.Api.ProviderBuilderExtensions": "[1.21.0, 2.0.0)"
         }
       },
+      "OpenTelemetry.Instrumentation.EntityFrameworkCore": {
+        "type": "CentralTransitive",
+        "requested": "[1.21.0-beta.1, )",
+        "resolved": "1.21.0-beta.1",
+        "contentHash": "cZZoG3cfMu8jqapbDVYi8IXgV27pL629BlZuDwxuUwPTVTHSyrI8j5RYuQYm0Wsssetky41u33Z7tYfG1xyQlg==",
+        "dependencies": {
+          "Microsoft.Extensions.Configuration": "10.0.0",
+          "Microsoft.Extensions.Options": "10.0.0",
+          "OpenTelemetry.Api.ProviderBuilderExtensions": "[1.21.0, 2.0.0)"
+        }
+      },
       "OpenTelemetry.Instrumentation.Http": {
         "type": "CentralTransitive",
         "requested": "[1.21.0, )",
@@ -1690,6 +1704,15 @@
           "Serilog.Sinks.Console": "6.1.1",
           "Serilog.Sinks.Debug": "3.0.0",
           "Serilog.Sinks.File": "7.0.0"
+        }
+      },
+      "Serilog.Enrichers.Span": {
+        "type": "CentralTransitive",
+        "requested": "[3.1.0, )",
+        "resolved": "3.1.0",
+        "contentHash": "xNxy5FxIuLLusRHBpJwJ/YqVw5S7Dtbt79NUsPQxDtu4+CYG4kJgjLs9fjZhKPMjZQL8GZRewT8brap9h2r+Vw==",
+        "dependencies": {
+          "Serilog": "2.10.0"
         }
       },
       "Serilog.Formatting.Compact": {

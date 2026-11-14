@@ -145,7 +145,7 @@
 | J01 | 点击批处理 | ✅ | Wolverine `BatchMessagesOf<ClickRecorded>` | 500 条 / 500ms；按 `event_id` 幂等写入 |
 | J02 | 点击不进消息表 | ✅ | 逐队列 `BufferedInMemory()` | 高频数据不做持久化 |
 | J03 | 封顶审计持久化 | ✅ | `LinkClickCapped` + `UseDurableInbox()` | 低频事件 opt-in |
-| J04 | 传输可切换 | ✅ | `Messaging:Transport` | `local` / `kafka` |
+| J04 | 传输可切换 | ✅ | `Messaging:Transport` | `local` / `rabbitmq` / `kafka` |
 | J05 | 配置启动期校验 | ✅ | `MessagingOptions.Validate` | 缺 broker、topic 前缀空直接失败 |
 | J06 | Kafka 生产验证 | ⬜ | — | 未跑真实 broker（技术债 14） |
 

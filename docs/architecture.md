@@ -183,7 +183,7 @@ sequenceDiagram
 
 | 维度 | 配置 | 决定什么 | 默认 |
 | --- | --- | --- | --- |
-| 传输 | `Messaging:Transport` | 发去哪：`local` 进程内 / `kafka` | `local` |
+| 传输 | `Messaging:Transport` | 发去哪：`local` 进程内 / `rabbitmq` / `kafka` | `local` |
 | 持久化 | `Messaging:Durable` | 是否先落本地消息表 | `false` |
 | 聚合 | `ClickBatchSize` / `ClickBatchTimeoutMilliseconds` | 攒批策略 | 500 条 / 500ms |
 
@@ -392,7 +392,7 @@ OTLP 端点为空时只打控制台，不外发——单机开发不需要 colle
 | `Analytics` | `TimeZone` / `Retention.*` | `UTC` / 关闭 | 时区**上线前**定，改后不回溯 |
 | `GeoIp` | `DatabasePath` / `CountryHeaders` / `ProvinceHeaders` / `Locales` | 空 / `CF-IPCountry`,`X-Country` / `X-Province` / `zh-CN`,`en` | 配库后按 IP 查，查不到回落请求头 |
 | `RateLimit` | `UseDistributed` / 四个 HTTP 阈值 | `null`（随 Redis）/ 10·600·20·10 | 阈值变更即时生效；MCP 配额见 `Mcp` 节 |
-| `Messaging` | `Transport` / `Durable` / 批处理 / `Kafka.*` | `local` / `false` / 500·500ms | 切 Kafka 会影响跳转延迟 |
+| `Messaging` | `Transport` / `Durable` / 批处理 / `RabbitMq.*` / `Kafka.*` | `local` / `false` / 500·500ms | 切 broker 会影响跳转延迟 |
 | `Mcp` | `Enabled` / `Path` / `PermitPerMinute` | `false` / `/mcp` / 120 | 等于开一个写入口 |
 | `ReverseProxy` | `TrustForwardedHeaders` | `false` | 仅可信代理后开启 |
 | `Cors` | `AllowedOrigins` | `localhost:5081` | 前端独立站点，必须白名单 |

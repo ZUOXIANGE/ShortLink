@@ -48,6 +48,13 @@ var useMySql = !string.Equals(
     builder.Configuration["ShortLink:Database"], "sqlite", StringComparison.OrdinalIgnoreCase);
 var useRedis = ReadBool(builder.Configuration, "ShortLink:UseRedis", fallback: true);
 var useKafka = ReadBool(builder.Configuration, "ShortLink:UseKafka", fallback: false);
+var useRabbitMq = ReadBool(builder.Configuration, "ShortLink:UseRabbitMq", fallback: false);
+if (useKafka && useRabbitMq)
+{
+    // 消息只有一个传输方向：两个开关同时打开说明配置写错了，直接起不来比猜一个更省事。
+    throw new InvalidOperationException(
+        "ShortLink:UseKafka 与 ShortLink:UseRabbitMq 不能同时打开。");
+}
 var useOpenObserve = ReadBool(builder.Configuration, "ShortLink:UseOpenObserve", fallback: true);
 var mySqlImageTag = builder.Configuration["ShortLink:MySqlImageTag"] ?? "8.4";
 var mySqlServerVersion = builder.Configuration["ShortLink:MySqlVersion"] ?? "8.4.0";
@@ -152,6 +159,27 @@ if (useKafka)
         .WithEnvironment("Messaging__Transport", "kafka")
         .WithEnvironment("Messaging__Kafka__BootstrapServers",
             ReferenceExpression.Create($"{kafka.GetEndpoint("tcp").Property(EndpointProperty.HostAndPort)}"));
+}
+
+if (useRabbitMq)
+{
+    // 口令与 MySQL 同口径：本地给容器开发值，publish 时留空由运维填。
+    var rabbitMqUser = isPublishMode
+        ? builder.AddParameter("rabbitmq-username")
+        : builder.AddParameter("rabbitmq-username", "shortlink");
+    var rabbitMqPassword = isPublishMode
+        ? builder.AddParameter("rabbitmq-password", secret: true)
+        : builder.AddParameter("rabbitmq-password", "Rabbit123456", secret: true);
+
+    var rabbitMq = builder.AddRabbitMQ("rabbitmq", rabbitMqUser, rabbitMqPassword);
+
+    // 显式键而不是 ConnectionStrings__*：应用侧只认 Messaging__*（与 Kafka 分支一致），
+    // 连接串由端口表达式拼出，避免写死映射端口。
+    api.WaitFor(rabbitMq)
+        .WithEnvironment("Messaging__Transport", "rabbitmq")
+        .WithEnvironment("Messaging__RabbitMq__ConnectionString",
+            ReferenceExpression.Create(
+                $"amqp://{rabbitMqUser.Resource}:{rabbitMqPassword.Resource}@{rabbitMq.GetEndpoint("tcp").Property(EndpointProperty.HostAndPort)}"));
 }
 
 // ── 可观测性后端：OpenObserve（仅本地编排）──────────────────────────────

@@ -25,6 +25,7 @@ public sealed class MessagingOptionsTests
 
         // 默认值要能「裸奔部署」：不依赖 Redis/Kafka/消息表，一个 SQLite 文件就能跑起来。
         Assert.Equal(MessageTransports.Local, options.Transport);
+        Assert.False(options.IsRabbitMq);
         Assert.False(options.IsKafka);
         Assert.False(options.Durable);
         Assert.True(options.ClickBatchSize > 0);
@@ -50,11 +51,36 @@ public sealed class MessagingOptionsTests
     {
         var options = Build(new Dictionary<string, string?>
         {
-            ["Messaging:Transport"] = "rabbitmq",
+            ["Messaging:Transport"] = "redis",
         }).GetSection(MessagingOptions.SectionName).Get<MessagingOptions>()!;
 
         var exception = Assert.Throws<InvalidOperationException>(options.Validate);
         Assert.Contains("Transport", exception.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void RabbitMq_Without_ConnectionString_Should_Throw_On_Validate()
+    {
+        var options = new MessagingOptions { Transport = MessageTransports.RabbitMq };
+
+        var exception = Assert.Throws<InvalidOperationException>(options.Validate);
+        Assert.Contains("ConnectionString", exception.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void RabbitMq_With_ConnectionString_Should_Pass_And_Default_Queue()
+    {
+        var options = Build(new Dictionary<string, string?>
+        {
+            ["Messaging:Transport"] = "RabbitMq",
+            ["Messaging:RabbitMq:ConnectionString"] = "amqp://guest:guest@localhost:5672",
+        }).GetSection(MessagingOptions.SectionName).Get<MessagingOptions>()!;
+
+        options.Validate();
+
+        Assert.True(options.IsRabbitMq);
+        Assert.False(options.IsKafka);
+        Assert.Equal("shortlink", options.RabbitMq.QueueName);
     }
 
     [Fact]

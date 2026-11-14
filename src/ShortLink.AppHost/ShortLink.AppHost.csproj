@@ -25,6 +25,7 @@
     <PackageReference Include="Aspire.Hosting.MySql" />
     <PackageReference Include="Aspire.Hosting.Redis" />
     <PackageReference Include="Aspire.Hosting.Kafka" />
+    <PackageReference Include="Aspire.Hosting.RabbitMQ" />
     <!-- 发布端：只在 publish 模式生效，run 模式不参与编排 -->
     <PackageReference Include="Aspire.Hosting.Docker" />
     <PackageReference Include="Aspire.Hosting.Kubernetes" />

@@ -6,7 +6,7 @@ namespace ShortLink.Infrastructure.Options;
 /// 三个开关互相独立，别混为一谈：
 /// </para>
 /// <list type="bullet">
-/// <item><see cref="Transport"/> 决定消息<b>发去哪</b>（进程内 / Kafka）。</item>
+/// <item><see cref="Transport"/> 决定消息<b>发去哪</b>（进程内 / RabbitMQ / Kafka）。</item>
 /// <item><see cref="Durable"/> 决定消息<b>是否先落库</b>（outbox）。</item>
 /// <item><see cref="ClickBatchSize"/> 等决定点击消息<b>怎么聚合</b>。</item>
 /// </list>
@@ -16,7 +16,7 @@ public sealed class MessagingOptions
 {
     public const string SectionName = "Messaging";
 
-    /// <summary>传输方式：<c>local</c>（默认，进程内）或 <c>kafka</c>。</summary>
+    /// <summary>传输方式：<c>local</c>（默认，进程内）、<c>rabbitmq</c> 或 <c>kafka</c>。</summary>
     public string Transport { get; set; } = MessageTransports.Local;
 
     /// <summary>
@@ -36,26 +36,47 @@ public sealed class MessagingOptions
     /// <summary>点击消息的聚合等待时长（毫秒）。把突发流量合并成一批，代价是统计延迟。</summary>
     public int ClickBatchTimeoutMilliseconds { get; set; } = 500;
 
+    /// <summary>RabbitMQ 连接参数，仅在 <see cref="Transport"/> 为 <c>rabbitmq</c> 时生效。</summary>
+    public RabbitMqTransportOptions RabbitMq { get; set; } = new();
+
     /// <summary>Kafka 连接参数，仅在 <see cref="Transport"/> 为 <c>kafka</c> 时生效。</summary>
     public KafkaTransportOptions Kafka { get; set; } = new();
+
+    public bool IsRabbitMq => string.Equals(Transport, MessageTransports.RabbitMq, StringComparison.OrdinalIgnoreCase);
 
     public bool IsKafka => string.Equals(Transport, MessageTransports.Kafka, StringComparison.OrdinalIgnoreCase);
 
     /// <summary>
     /// 启动期校验。宁可起不来也不要在运行中静默丢消息——
-    /// 配了 Kafka 却没填 broker 地址这种错误，等到第一次跳转才发现就太晚了。
+    /// 配了 RabbitMQ 却没填连接串、配了 Kafka 却没填 broker 地址，等到第一次跳转才发现就太晚了。
     /// </summary>
     public void Validate()
     {
-        if (!IsKafka)
+        if (string.Equals(Transport, MessageTransports.Local, StringComparison.OrdinalIgnoreCase))
         {
-            if (!string.Equals(Transport, MessageTransports.Local, StringComparison.OrdinalIgnoreCase))
+            return;
+        }
+
+        if (IsRabbitMq)
+        {
+            if (string.IsNullOrWhiteSpace(RabbitMq.ConnectionString))
             {
                 throw new InvalidOperationException(
-                    $"Messaging:Transport 只能是 'local' 或 'kafka'，当前为 '{Transport}'");
+                    "Messaging:Transport 为 rabbitmq 时必须配置 Messaging:RabbitMq:ConnectionString");
+            }
+
+            if (string.IsNullOrWhiteSpace(RabbitMq.QueueName))
+            {
+                throw new InvalidOperationException("Messaging:RabbitMq:QueueName 不能为空");
             }
 
             return;
+        }
+
+        if (!IsKafka)
+        {
+            throw new InvalidOperationException(
+                $"Messaging:Transport 只能是 'local'、'rabbitmq' 或 'kafka'，当前为 '{Transport}'");
         }
 
         if (string.IsNullOrWhiteSpace(Kafka.BootstrapServers))
@@ -80,8 +101,23 @@ public static class MessageTransports
     /// <summary>进程内队列。单实例部署、或不需要跨实例消费时使用。</summary>
     public const string Local = "local";
 
+    /// <summary>RabbitMQ。需要跨实例消费、但不要求重放或超大规模吞吐时使用。</summary>
+    public const string RabbitMq = "rabbitmq";
+
     /// <summary>Kafka。跨实例消费、需要外部系统订阅或需要重放时使用。</summary>
     public const string Kafka = "kafka";
+}
+
+public sealed class RabbitMqTransportOptions
+{
+    /// <summary>AMQP 连接串，如 <c>amqp://user:password@localhost:5672</c>。</summary>
+    public string ConnectionString { get; set; } = string.Empty;
+
+    /// <summary>
+    /// 收发共用的队列名。三种消息走同一个队列，理由与 Kafka 侧「一个消费者收全量」相同：
+    /// 减少连接与声明开销。多环境共用一个 broker 时必须改成互不相同的名字，否则会互相抢消息。
+    /// </summary>
+    public string QueueName { get; set; } = "shortlink";
 }
 
 public sealed class KafkaTransportOptions

@@ -9,6 +9,7 @@ using Wolverine;
 using Wolverine.Kafka;
 using Wolverine.MySql;
 using Wolverine.Postgresql;
+using Wolverine.RabbitMQ;
 using Wolverine.Sqlite;
 
 namespace ShortLink.Infrastructure.Messaging;
@@ -37,6 +38,11 @@ namespace ShortLink.Infrastructure.Messaging;
 /// <description>跨实例消费、可供外部系统订阅、支持重放。需要真实 broker，
 /// 启动期会校验 <c>Messaging:Kafka:BootstrapServers</c>。</description>
 /// </item>
+/// <item>
+/// <term>rabbitmq</term>
+/// <description>跨实例消费，多实例按队列分摊消息。需要真实 broker，
+/// 启动期会校验 <c>Messaging:RabbitMq:ConnectionString</c>。</description>
+/// </item>
 /// </list>
 /// </summary>
 public static class MessagingSetup
@@ -61,6 +67,11 @@ public static class MessagingSetup
             // handler 与工具类都在 Infrastructure 程序集；显式指定避免扫描到测试宿主或 Api。
             wolverine.ApplicationAssembly = typeof(MessagingSetup).Assembly;
             wolverine.ServiceName = "shortlink";
+
+            // 消息处理（点击批落库、封顶审计）默认不建 span，只有发送侧有痕迹，
+            // 「这批点击为什么慢/失败」就断在 handler 里。Full 模式会补上接收与执行两段，
+            // ActivitySource 名为 "Wolverine"，由 Api 侧的 tracing.AddSource 订阅。
+            wolverine.InvokeTracing = InvokeTracingMode.Full;
 
             // Wolverine 6 起默认禁止生成代码里出现「服务定位」，它希望所有依赖都能被内联构造。
             // 但 EF Core 的 DbContext 是通过 AddDbContext 注册的：DbContextOptions 由不透明工厂委托产出，
@@ -92,6 +103,12 @@ public static class MessagingSetup
                 // 同一批点击被记两遍。
                 wolverine.Policies.DisableConventionalLocalRouting();
                 ConfigureKafka(wolverine, options);
+            }
+            else if (options.IsRabbitMq)
+            {
+                // 与 Kafka 同理：不关约定式路由，同一条消息会被本地队列与 RabbitMQ 各消费一次。
+                wolverine.Policies.DisableConventionalLocalRouting();
+                ConfigureRabbitMq(wolverine, options);
             }
 
             // ── 点击：永远只在内存里排队，不进消息表 ──
@@ -194,5 +211,30 @@ public static class MessagingSetup
         wolverine.PublishMessage<LinkDisabled>().ToKafkaTopic(disabledTopic);
 
         wolverine.ListenToKafkaTopics(clickTopic, cappedTopic, disabledTopic);
+    }
+
+    /// <summary>
+    /// RabbitMQ 模式：三种消息共用一个队列，多实例作为竞争消费者分摊。
+    /// <para>
+    /// 用 <c>AutoProvision</c> 自动声明队列与默认死信队列；生产若要求手工建队列，
+    /// 预先建好同名队列后不会再被覆盖。这里不再叠加 <c>UseDurableInbox</c>：
+    /// broker 侧「未 ack 即重新投递」已经覆盖了进程崩溃的语义，
+    /// 再给共享队列（含高频点击）套一层 inbox 只会多一次 INSERT + DELETE。
+    /// </para>
+    /// <para>
+    /// 需要按消息类型隔离吞吐时，把下面三行改成各自命名队列，并逐个 Listen 即可。
+    /// </para>
+    /// </summary>
+    private static void ConfigureRabbitMq(WolverineOptions wolverine, MessagingOptions options)
+    {
+        var queue = options.RabbitMq.QueueName;
+
+        wolverine.UseRabbitMq(options.RabbitMq.ConnectionString).AutoProvision();
+
+        wolverine.PublishMessage<ClickRecorded>().ToRabbitQueue(queue);
+        wolverine.PublishMessage<LinkClickCapped>().ToRabbitQueue(queue);
+        wolverine.PublishMessage<LinkDisabled>().ToRabbitQueue(queue);
+
+        wolverine.ListenToRabbitQueue(queue);
     }
 }

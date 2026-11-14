@@ -15,6 +15,7 @@ using OpenTelemetry.Resources;
 using OpenTelemetry.Trace;
 using Scalar.AspNetCore;
 using Serilog;
+using Serilog.Enrichers.Span;
 using Serilog.Formatting.Compact;
 using ShortLink.Api.Endpoints;
 using ShortLink.Api.Infrastructure;
@@ -63,6 +64,9 @@ try
             .ReadFrom.Configuration(context.Configuration)
             .Enrich.FromLogContext()
             .Enrich.WithProperty("service.name", "shortlink-api")
+            // 控制台/文件 sink 不在 OTel 管线上，默认不带 trace 信息；
+            // 补上 TraceId/SpanId 后，日志里的错误能直接跳到对应 trace（OTLP 那份本来就有）。
+            .Enrich.WithSpan()
             .WriteTo.Console(
                 formatProvider: CultureInfo.InvariantCulture,
                 outputTemplate: ConsoleTemplate);
@@ -237,6 +241,16 @@ try
         }
     }
 
+    // FusionCache 把遥测按层级拆成四个名字（根 / 内存 / 分布式 / 背板）。
+    // 库只负责发，不在这里注册就一条都出不来——缓存命中率、工厂失败、分布式熔断、背板收发全黑。
+    string[] fusionCacheSignals =
+    [
+        "ZiggyCreatures.Caching.Fusion",
+        "ZiggyCreatures.Caching.Fusion.Memory",
+        "ZiggyCreatures.Caching.Fusion.Distributed",
+        "ZiggyCreatures.Caching.Fusion.Backplane",
+    ];
+
     builder.Services
         .AddOpenTelemetry()
         .ConfigureResource(resource => resource
@@ -250,6 +264,25 @@ try
             tracing.AddAspNetCoreInstrumentation(options =>
                 options.Filter = context => !context.Request.Path.StartsWithSegments("/health"));
             tracing.AddHttpClientInstrumentation();
+
+            // EF Core 只发 DiagnosticListener、自身没有 ActivitySource，必须靠 instrumentation 包订阅。
+            // 包会带上（截断后的）SQL 文本，排查「哪条查询拖慢了这个请求」靠的就是它。
+            tracing.AddEntityFrameworkCoreInstrumentation();
+
+            // 驱动层各有自己的 ActivitySource（名字即驱动名）：建连、连接池等待与命令执行。
+            // SQLite 驱动不发 Activity，所以不在这里注册。
+            tracing.AddSource("MySqlConnector");
+            tracing.AddSource("Npgsql");
+
+            // 消息总线：Wolverine 的 ActivitySource 名为 "Wolverine"，
+            // 另需在 MessagingSetup 里打开 InvokeTracing，否则它不会创建 span。
+            tracing.AddSource("Wolverine");
+
+            foreach (var source in fusionCacheSignals)
+            {
+                tracing.AddSource(source);
+            }
+
             tracing.AddSource(ShortLinkDiagnostics.ActivitySourceName);
             tracing.AddSource(McpDiagnostics.ActivitySourceName);
 
@@ -262,6 +295,12 @@ try
         {
             metrics.AddAspNetCoreInstrumentation();
             metrics.AddRuntimeInstrumentation();
+
+            foreach (var meter in fusionCacheSignals)
+            {
+                metrics.AddMeter(meter);
+            }
+
             metrics.AddMeter(ShortLinkDiagnostics.MeterName);
             metrics.AddMeter(McpDiagnostics.MeterName);
 

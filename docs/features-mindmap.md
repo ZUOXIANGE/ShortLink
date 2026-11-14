@@ -32,7 +32,7 @@ mindmap
       Redis 可选背板
     消息
       Wolverine 6.64
-      local 或 kafka
+      local / rabbitmq / kafka
       500 条或 500ms
       逐队列 opt-in 持久化
     可观测性
@@ -217,7 +217,7 @@ flowchart TD
 | 单机 | SQLite + 本地队列 + 无 Redis |
 | 多实例 | MySQL / PostgreSQL + Redis（缓存 + 限流） |
 | 反代 / CDN | Host 透传、`ReverseProxy:KnownProxies`、剥离伪造头 |
-| 事件流 | `Messaging:Transport=kafka`（broker 未联调） |
+| 事件流 | `Messaging:Transport=kafka` / `rabbitmq`（broker 未联调） |
 | 前端 | 纯静态托管，与 Api 独立扩缩容 |
 
 ## 7. 质量与决策

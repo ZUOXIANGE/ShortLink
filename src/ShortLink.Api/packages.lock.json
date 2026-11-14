@@ -93,6 +93,15 @@
           "OpenTelemetry.Api.ProviderBuilderExtensions": "[1.21.0, 2.0.0)"
         }
       },
+      "OpenTelemetry.Instrumentation.EntityFrameworkCore": {
+        "type": "Direct",
+        "requested": "[1.21.0-beta.1, )",
+        "resolved": "1.21.0-beta.1",
+        "contentHash": "cZZoG3cfMu8jqapbDVYi8IXgV27pL629BlZuDwxuUwPTVTHSyrI8j5RYuQYm0Wsssetky41u33Z7tYfG1xyQlg==",
+        "dependencies": {
+          "OpenTelemetry.Api.ProviderBuilderExtensions": "[1.21.0, 2.0.0)"
+        }
+      },
       "OpenTelemetry.Instrumentation.Http": {
         "type": "Direct",
         "requested": "[1.21.0, )",
@@ -130,6 +139,15 @@
           "Serilog.Sinks.Console": "6.1.1",
           "Serilog.Sinks.Debug": "3.0.0",
           "Serilog.Sinks.File": "7.0.0"
+        }
+      },
+      "Serilog.Enrichers.Span": {
+        "type": "Direct",
+        "requested": "[3.1.0, )",
+        "resolved": "3.1.0",
+        "contentHash": "xNxy5FxIuLLusRHBpJwJ/YqVw5S7Dtbt79NUsPQxDtu4+CYG4kJgjLs9fjZhKPMjZQL8GZRewT8brap9h2r+Vw==",
+        "dependencies": {
+          "Serilog": "2.10.0"
         }
       },
       "Serilog.Formatting.Compact": {
@@ -745,6 +763,11 @@
         "resolved": "8.6.5",
         "contentHash": "t+sUVrIwvo7UmsgHGgOG9F0GDZSRIm47u2ylH17Gvcv1q5hNEwgD5GoBlFyc0kh/pebmPyrAgvGsR/65ZBaXlg=="
       },
+      "RabbitMQ.Client": {
+        "type": "Transitive",
+        "resolved": "7.2.2",
+        "contentHash": "k4b6RnTXpLbsF96V93ooNYxgPMnoA2tEm24B6AXNJr1mG8wwNYdA1XJtgU66L5xqeGyveS7SJriRzlX3cbqQNA=="
+      },
       "Serilog": {
         "type": "Transitive",
         "resolved": "4.3.0",
@@ -957,6 +980,15 @@
           "Weasel.Core": "9.50.0"
         }
       },
+      "WolverineFx.Newtonsoft": {
+        "type": "Transitive",
+        "resolved": "6.64.0",
+        "contentHash": "p6Syrb0V8NZLlddTdYzvEpqJfNwMnKi8b3Z9LzQo4dSYkZx/I1uPs3LDr7uCT7ijbkLhAoJpjp2o/puSHOSKiA==",
+        "dependencies": {
+          "Newtonsoft.Json": "13.0.3",
+          "WolverineFx": "6.64.0"
+        }
+      },
       "WolverineFx.RDBMS": {
         "type": "Transitive",
         "resolved": "6.64.0",
@@ -1001,6 +1033,7 @@
           "WolverineFx.Kafka": "[6.64.0, )",
           "WolverineFx.MySql": "[6.64.0, )",
           "WolverineFx.Postgresql": "[6.64.0, )",
+          "WolverineFx.RabbitMQ": "[6.64.0, )",
           "WolverineFx.RuntimeCompilation": "[6.64.0, )",
           "WolverineFx.Sqlite": "[6.64.0, )",
           "ZiggyCreatures.FusionCache": "[2.9.0, )",
@@ -1207,6 +1240,17 @@
         "dependencies": {
           "Weasel.Postgresql": "9.50.0",
           "WolverineFx.RDBMS": "6.64.0"
+        }
+      },
+      "WolverineFx.RabbitMQ": {
+        "type": "CentralTransitive",
+        "requested": "[6.64.0, )",
+        "resolved": "6.64.0",
+        "contentHash": "WNTX/kMQRKUrpqCs9gkdTKlF2r0h5H3RGUg8FACAIMOvAyMDlAaJjTupXoYUx1oS+OffwVMjLyZwy6dWt0gEDA==",
+        "dependencies": {
+          "RabbitMQ.Client": "7.2.2",
+          "WolverineFx": "6.64.0",
+          "WolverineFx.Newtonsoft": "6.64.0"
         }
       },
       "WolverineFx.RuntimeCompilation": {
