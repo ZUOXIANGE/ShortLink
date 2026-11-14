@@ -32,5 +32,6 @@ builder.Services.AddScoped(sp =>
 builder.Services.AddScoped<ApiClient>();
 builder.Services.AddScoped<Permissions>();
 builder.Services.AddScoped<FileSaver>();
+builder.Services.AddScoped<MapAssets>();
 
 await builder.Build().RunAsync();

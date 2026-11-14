@@ -20,5 +20,24 @@ window.shortlink = {
             console.error('saveFile failed', e);
             return false;
         }
+    },
+
+    // ISO2 → 中文国家名。浏览器未实现 Intl.DisplayNames 时返回空对象，由调用方回退英文名。
+    regionDisplayNames: function (codes) {
+        try {
+            const display = new Intl.DisplayNames(['zh-CN'], { type: 'region' });
+            const result = {};
+            for (const code of codes) {
+                const key = String(code).toUpperCase();
+                try {
+                    result[key] = display.of(key) || key;
+                } catch {
+                    result[key] = key;
+                }
+            }
+            return result;
+        } catch {
+            return {};
+        }
     }
 };

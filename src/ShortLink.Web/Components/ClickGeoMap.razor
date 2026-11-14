@@ -1,0 +1,388 @@
+@* 归属地分布：世界国家 / 中国省份。地图数据是预生成的 SVG path，不引入图表库。 *@
+@inject MapAssets Maps
+@inject IJSRuntime JS
+
+<MudPaper Elevation="0" Class="geo-card pa-4">
+    <div class="d-flex align-center justify-space-between flex-wrap gap-2 mb-2">
+        <div>
+            <MudText Typo="Typo.subtitle2">归属地分布</MudText>
+            <MudText Typo="Typo.caption" Class="geo-hint">按 IP 解析的国家 / 地区，颜色越深点击越多</MudText>
+        </div>
+        <MudToggleGroup T="string" Value="_view" ValueChanged="OnViewChanged"
+                        SelectionMode="SelectionMode.SingleSelection"
+                        Outlined="true" Color="Color.Primary" Size="Size.Small">
+            <MudToggleItem T="string" Value="@("world")" Text="世界国家" />
+            <MudToggleItem T="string" Value="@("china")" Text="中国省份" />
+        </MudToggleGroup>
+    </div>
+
+    @if (_loading)
+    {
+        <MudProgressLinear Color="Color.Primary" Indeterminate="true" Class="my-8" />
+    }
+    else if (_map is null)
+    {
+        <MudText Typo="Typo.body2" Class="geo-empty">地图数据加载失败</MudText>
+    }
+    else if (HasNoData)
+    {
+        <MudText Typo="Typo.body2" Class="geo-empty">
+            @(_view == ChinaView ? "该区间没有中国内地的归属地数据" : "该区间暂无归属地数据，确认已配置 GeoIp 或 CDN 来源头")
+        </MudText>
+    }
+    else
+    {
+        <div class="geo-wrap">
+            <svg class="geo-map" viewBox="@_map.ViewBox" role="img" aria-label="点击归属地分布地图">
+                @foreach (var location in _map.Locations)
+                {
+                    var clicks = ClicksFor(location);
+                    <path @key="location.Id"
+                          d="@location.Path"
+                          fill="@Fill(clicks)"
+                          fill-rule="evenodd"
+                          class="geo-region">
+                        <title>@LabelFor(location) · @clicks 次（@Percent(clicks).ToString("0.##")%）</title>
+                    </path>
+                }
+            </svg>
+        </div>
+
+        <div class="geo-legend">
+            <span class="geo-hint">少</span>
+            @foreach (var color in ScaleColors)
+            {
+                <span class="geo-swatch" style="background:@color"></span>
+            }
+            <span class="geo-hint">多</span>
+            @if (!string.IsNullOrEmpty(UnmatchedText))
+            {
+                <span class="geo-hint geo-unmatched">@UnmatchedText</span>
+            }
+        </div>
+
+        @if (_view == ChinaView && _topProvinces.Count > 0)
+        {
+            <div class="geo-top">
+                @foreach (var item in _topProvinces)
+                {
+                    <div class="geo-top-row">
+                        <span>@item.Name</span>
+                        <span>@item.Clicks</span>
+                    </div>
+                }
+            </div>
+        }
+
+        <MudText Typo="Typo.caption" Class="geo-hint geo-source">@SourceText</MudText>
+    }
+</MudPaper>
+
+@code {
+    private const string WorldView = "world";
+    private const string ChinaView = "china";
+    private const string NoDataColor = "#eee7e8";
+
+    private static readonly string[] ScaleColors =
+    [
+        "#f6eef0", "#f3cdd4", "#e797a5", "#d4556c", "#8c0619",
+    ];
+
+    [Parameter]
+    public IReadOnlyList<DimensionItemDto> Countries { get; set; } = [];
+
+    [Parameter]
+    public IReadOnlyList<DimensionItemDto> Provinces { get; set; } = [];
+
+    [Parameter]
+    public long UnknownClicks { get; set; }
+
+    private string _view = WorldView;
+    private MapDefinition? _map;
+    private bool _loading = true;
+
+    private Dictionary<string, long> _countryClicks = new(StringComparer.OrdinalIgnoreCase);
+    private Dictionary<string, long> _provinceClicks = new(StringComparer.OrdinalIgnoreCase);
+    private Dictionary<string, string> _countryNames = new(StringComparer.OrdinalIgnoreCase);
+    private List<(string Name, long Clicks)> _topProvinces = [];
+
+    private long _worldTotal;
+    private long _chinaClicks;
+    private long _matchedProvinceClicks;
+    private long _unmatchedProvinceClicks;
+    private long _unmatchedCountryClicks;
+    private long _maxClicks;
+
+    private bool HasNoData => _view == ChinaView ? _chinaClicks == 0 : _worldTotal == 0;
+
+    private string UnmatchedText => _view == ChinaView
+        ? (_unmatchedProvinceClicks > 0 ? $"未匹配省份 {_unmatchedProvinceClicks} 次" : string.Empty)
+        : (_unmatchedCountryClicks > 0 ? $"未匹配 / 未知 {_unmatchedCountryClicks} 次" : string.Empty);
+
+    private string SourceText => _view == ChinaView
+        ? "地图数据：cn-atlas（ISC，含港澳台）"
+        : "地图数据：Natural Earth（公有领域）";
+
+    protected override void OnParametersSet() => RebuildData();
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            await LoadAsync(_view);
+        }
+    }
+
+    private async Task OnViewChanged(string view)
+    {
+        if (string.Equals(_view, view, StringComparison.Ordinal))
+        {
+            return;
+        }
+
+        _view = view;
+        await LoadAsync(view);
+    }
+
+    private async Task LoadAsync(string view)
+    {
+        _loading = true;
+        await InvokeAsync(StateHasChanged);
+
+        try
+        {
+            _map = view == ChinaView ? await Maps.GetChinaAsync() : await Maps.GetWorldAsync();
+            if (view == WorldView && _countryNames.Count == 0)
+            {
+                await LoadCountryNamesAsync();
+            }
+        }
+        catch (JSException)
+        {
+            _map = null;
+        }
+        catch (HttpRequestException)
+        {
+            _map = null;
+        }
+        finally
+        {
+            _loading = false;
+            RebuildData();
+            await InvokeAsync(StateHasChanged);
+        }
+    }
+
+    private async Task LoadCountryNamesAsync()
+    {
+        if (_map is null)
+        {
+            return;
+        }
+
+        try
+        {
+            var codes = _map.Locations.Select(location => location.Id).ToArray();
+            var names = await JS.InvokeAsync<Dictionary<string, string>>("shortlink.regionDisplayNames", codes);
+            _countryNames = new Dictionary<string, string>(names, StringComparer.OrdinalIgnoreCase);
+        }
+        catch (JSException)
+        {
+            // 浏览器不支持 Intl.DisplayNames：保留地图里的英文名。
+        }
+    }
+
+    private void RebuildData()
+    {
+        _countryClicks.Clear();
+        foreach (var item in Countries)
+        {
+            var code = GeoMapNormalizer.NormalizeCountry(item.Name);
+            if (code is null)
+            {
+                continue;
+            }
+
+            _countryClicks[code] = _countryClicks.GetValueOrDefault(code) + item.Clicks;
+        }
+
+        _provinceClicks.Clear();
+        _topProvinces = [];
+        _matchedProvinceClicks = 0;
+
+        if (_view == ChinaView && _map is not null)
+        {
+            var lookup = BuildProvinceLookup(_map);
+            var totals = new Dictionary<string, long>(StringComparer.OrdinalIgnoreCase);
+            foreach (var item in Provinces)
+            {
+                var key = GeoMapNormalizer.NormalizeProvince(item.Name);
+                if (!lookup.TryGetValue(key, out var location))
+                {
+                    continue;
+                }
+
+                totals[location.Id] = totals.GetValueOrDefault(location.Id) + item.Clicks;
+            }
+
+            foreach (var pair in totals)
+            {
+                _provinceClicks[pair.Key] = pair.Value;
+            }
+
+            _matchedProvinceClicks = totals.Values.Sum();
+            _topProvinces = _map.Locations
+                .Select(location => (Name: location.Name, Clicks: _provinceClicks.GetValueOrDefault(location.Id)))
+                .Where(item => item.Clicks > 0)
+                .OrderByDescending(item => item.Clicks)
+                .Take(5)
+                .ToList();
+        }
+
+        _chinaClicks = _countryClicks.GetValueOrDefault("CN");
+        _unmatchedProvinceClicks = Math.Max(0, _chinaClicks - _matchedProvinceClicks);
+
+        var mapIds = _map?.Locations
+            .Select(location => location.Id.ToUpperInvariant())
+            .ToHashSet(StringComparer.OrdinalIgnoreCase);
+        var unmatched = UnknownClicks;
+        foreach (var pair in _countryClicks)
+        {
+            if (mapIds is not null && mapIds.Contains(pair.Key))
+            {
+                continue;
+            }
+
+            unmatched += pair.Value;
+        }
+
+        _unmatchedCountryClicks = unmatched;
+        _worldTotal = _countryClicks.Values.Sum() + UnknownClicks;
+        _maxClicks = _view == ChinaView
+            ? _provinceClicks.Values.DefaultIfEmpty(0).Max()
+            : (_map?.Locations
+                .Select(location => _countryClicks.GetValueOrDefault(location.Id.ToUpperInvariant()))
+                .DefaultIfEmpty(0)
+                .Max() ?? 0);
+    }
+
+    private static Dictionary<string, MapLocation> BuildProvinceLookup(MapDefinition map)
+    {
+        var lookup = new Dictionary<string, MapLocation>(StringComparer.OrdinalIgnoreCase);
+        foreach (var location in map.Locations)
+        {
+            lookup.TryAdd(GeoMapNormalizer.NormalizeProvince(location.Name), location);
+            lookup.TryAdd(location.Name, location);
+        }
+
+        return lookup;
+    }
+
+    private long ClicksFor(MapLocation location) => _view == ChinaView
+        ? _provinceClicks.GetValueOrDefault(location.Id)
+        : _countryClicks.GetValueOrDefault(location.Id.ToUpperInvariant());
+
+    private string LabelFor(MapLocation location) => _view == ChinaView
+        ? location.Name
+        : _countryNames.GetValueOrDefault(location.Id.ToUpperInvariant(), location.Name);
+
+    private double Percent(long clicks)
+    {
+        var total = _view == ChinaView ? _chinaClicks : _worldTotal;
+        return total <= 0 ? 0 : Math.Round(clicks * 100d / total, 2);
+    }
+
+    private string Fill(long clicks)
+    {
+        if (clicks <= 0 || _maxClicks <= 0)
+        {
+            return NoDataColor;
+        }
+
+        var ratio = (double)clicks / _maxClicks;
+        return ratio switch
+        {
+            >= 0.66 => ScaleColors[4],
+            >= 0.4 => ScaleColors[3],
+            >= 0.2 => ScaleColors[2],
+            >= 0.05 => ScaleColors[1],
+            _ => ScaleColors[0],
+        };
+    }
+}
+
+<style>
+    .geo-card {
+        border: 1px solid #F0E4E6;
+        border-radius: 14px;
+    }
+
+    .geo-hint {
+        font-size: 12px;
+        color: #9b8085;
+    }
+
+    .geo-wrap {
+        width: 100%;
+        overflow: hidden;
+    }
+
+    .geo-map {
+        display: block;
+        width: 100%;
+        height: auto;
+    }
+
+    .geo-region {
+        stroke: #ffffff;
+        stroke-width: 0.3;
+        transition: fill 0.15s ease;
+    }
+
+    .geo-region:hover {
+        stroke: #8c0619;
+        stroke-width: 0.8;
+    }
+
+    .geo-legend {
+        display: flex;
+        align-items: center;
+        gap: 4px;
+        flex-wrap: wrap;
+        margin-top: 8px;
+    }
+
+    .geo-swatch {
+        width: 18px;
+        height: 8px;
+        border-radius: 2px;
+    }
+
+    .geo-unmatched {
+        margin-left: 8px;
+    }
+
+    .geo-empty {
+        padding: 32px 0;
+        color: #9b8085;
+        text-align: center;
+    }
+
+    .geo-top {
+        margin-top: 12px;
+        padding-top: 8px;
+        border-top: 1px solid #f3e7e9;
+    }
+
+    .geo-top-row {
+        display: flex;
+        justify-content: space-between;
+        padding: 2px 0;
+        color: #4a2b2f;
+        font-size: 13px;
+    }
+
+    .geo-source {
+        margin-top: 8px;
+    }
+</style>

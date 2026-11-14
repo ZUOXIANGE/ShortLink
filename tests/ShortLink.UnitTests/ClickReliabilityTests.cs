@@ -5,8 +5,8 @@ using ShortLink.Application.Abstractions;
 using ShortLink.Application.Messaging;
 using ShortLink.Application.Redirection;
 using ShortLink.Contracts;
-using ShortLink.Domain.Domains;
 using ShortLink.Domain.Analytics;
+using ShortLink.Domain.Domains;
 using ShortLink.Domain.Links;
 using ShortLink.Infrastructure.Analytics;
 using ShortLink.Infrastructure.Messaging.Handlers;
@@ -214,7 +214,9 @@ internal static class TestData
         long? routeId,
         DateTime clickedAtUtc,
         bool isBot,
-        string visitorHash)
+        string visitorHash,
+        string? country = null,
+        string? province = null)
         => ClickEvent.Create(
             1,
             linkId,
@@ -227,8 +229,8 @@ internal static class TestData
             "127.0.0.1",
             "test-agent",
             null,
-            null,
-            null,
+            country,
+            province,
             "desktop",
             "Chrome",
             "Windows",

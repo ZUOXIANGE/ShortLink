@@ -35,7 +35,7 @@ public sealed class ExportService(
 
     private static readonly string[] ClickHeaders =
     [
-        "点击时间(UTC)", "短码", "分支ID", "IP", "国家", "设备", "浏览器", "操作系统", "来源", "是否机器人",
+        "点击时间(UTC)", "短码", "分支ID", "IP", "国家", "省份", "设备", "浏览器", "操作系统", "来源", "是否机器人",
     ];
 
     public async Task<ExportMetadata> GetLinkExportMetadataAsync(LinkQuery query, CancellationToken cancellationToken)
@@ -144,6 +144,7 @@ public sealed class ExportService(
                 click.RouteId?.ToString(CultureInfo.InvariantCulture),
                 click.Ip,
                 click.Country,
+                click.Province,
                 click.Device,
                 click.Browser,
                 click.OperatingSystem,

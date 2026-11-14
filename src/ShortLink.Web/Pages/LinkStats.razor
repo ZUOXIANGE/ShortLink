@@ -72,6 +72,10 @@ else
             <ClickTrend Data="_stats.Trend" />
         </MudItem>
 
+        <MudItem xs="12">
+            <ClickGeoMap Countries="_stats.Countries" Provinces="_stats.Provinces" UnknownClicks="_stats.UnknownCountryClicks" />
+        </MudItem>
+
         @if (_stats.Variants.Count > 0)
         {
             <MudItem xs="12">
@@ -122,7 +126,7 @@ else
             <DimensionList Title="操作系统" Items="_stats.OperatingSystems" />
         </MudItem>
         <MudItem xs="12" md="4">
-            <DimensionList Title="国家 / 地区" Items="_stats.Countries" />
+            <DimensionList Title="国家 / 地区" Items="_stats.Countries.Take(8).ToList()" />
         </MudItem>
 
         <MudItem xs="12">
@@ -133,6 +137,7 @@ else
                         <tr>
                             <th>时间（本地）</th>
                             <th>IP</th>
+                            <th>归属地</th>
                             <th>来源</th>
                             <th>设备</th>
                             <th>浏览器</th>
@@ -143,13 +148,14 @@ else
                     <tbody>
                         @if (_clicks.Count == 0)
                         {
-                            <tr><td colspan="7" style="text-align:center;color:#8a6a6f;">暂无访问记录</td></tr>
+                            <tr><td colspan="8" style="text-align:center;color:#8a6a6f;">暂无访问记录</td></tr>
                         }
                         @foreach (var click in _clicks)
                         {
                             <tr>
                                 <td>@click.ClickedAtUtc.ToLocalTime().ToString("MM-dd HH:mm:ss")</td>
                                 <td class="mono">@(click.Ip ?? "-")</td>
+                                <td>@GeoLabel(click)</td>
                                 <td class="truncate">@(click.Referer ?? "直接访问")</td>
                                 <td>@(click.Device ?? "-")</td>
                                 <td>@(click.Browser ?? "-")</td>
@@ -217,6 +223,13 @@ else
         {
             _loading = false;
         }
+    }
+
+    private static string GeoLabel(ClickLogDto click)
+    {
+        var parts = new[] { click.Country, click.Province }
+            .Where(value => !string.IsNullOrWhiteSpace(value));
+        return string.Join(" / ", parts) is { Length: > 0 } label ? label : "-";
     }
 
     private async Task ExportClicksAsync()

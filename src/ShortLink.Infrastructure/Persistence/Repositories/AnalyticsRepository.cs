@@ -14,6 +14,11 @@ public sealed class AnalyticsRepository(ShortLinkDbContext db) : IAnalyticsRepos
 {
     private const int DimensionTopN = 8;
 
+    // 国家/省份要覆盖整张地图，不能只取 TopN；上限用于防御客户端伪造请求头造成的基数爆炸。
+    private const int CountryLimit = 300;
+
+    private const int ProvinceLimit = 64;
+
     public async Task<LinkClickAggregate> GetLinkStatsAsync(
         long linkId,
         DateOnly fromDate,
@@ -46,7 +51,13 @@ public sealed class AnalyticsRepository(ShortLinkDbContext db) : IAnalyticsRepos
         var devices = await TopAsync(ranged, c => c.Device, cancellationToken).ConfigureAwait(false);
         var browsers = await TopAsync(ranged, c => c.Browser, cancellationToken).ConfigureAwait(false);
         var systems = await TopAsync(ranged, c => c.OperatingSystem, cancellationToken).ConfigureAwait(false);
-        var countries = await TopAsync(ranged, c => c.Country, cancellationToken).ConfigureAwait(false);
+        var countries = await GroupGeoAsync(ranged.Where(c => c.Country != null), c => c.Country, CountryLimit, cancellationToken)
+            .ConfigureAwait(false);
+        var provinces = await GroupGeoAsync(ranged.Where(c => c.Province != null), c => c.Province, ProvinceLimit, cancellationToken)
+            .ConfigureAwait(false);
+        var unknownCountryClicks = await ranged
+            .LongCountAsync(c => c.Country == null, cancellationToken)
+            .ConfigureAwait(false);
 
         return new LinkClickAggregate(
             totalClicks,
@@ -57,7 +68,9 @@ public sealed class AnalyticsRepository(ShortLinkDbContext db) : IAnalyticsRepos
             devices,
             browsers,
             systems,
-            countries);
+            countries,
+            provinces,
+            unknownCountryClicks);
     }
 
     public async Task<DashboardClickAggregate> GetDashboardAsync(
@@ -144,7 +157,8 @@ public sealed class AnalyticsRepository(ShortLinkDbContext db) : IAnalyticsRepos
                 c.OperatingSystem,
                 c.Country,
                 c.IsBot,
-                c.RouteId))
+                c.RouteId,
+                c.Province))
             .ToListAsync(cancellationToken)
             .ConfigureAwait(false);
 
@@ -188,7 +202,8 @@ public sealed class AnalyticsRepository(ShortLinkDbContext db) : IAnalyticsRepos
                 c.OperatingSystem,
                 c.Country,
                 c.IsBot,
-                c.RouteId))
+                c.RouteId,
+                c.Province))
             .AsAsyncEnumerable();
 
     /// <summary>按天聚合点击数，并按 (日期, 访客指纹) 去重计算独立访客；缺失日期补 0，保证趋势轴连续。</summary>
@@ -240,6 +255,30 @@ public sealed class AnalyticsRepository(ShortLinkDbContext db) : IAnalyticsRepos
 
         return rows
             .Select(r => new DimensionItemDto(string.IsNullOrWhiteSpace(r.Name) ? "未知" : r.Name!, r.Clicks))
+            .ToList();
+    }
+
+    /// <summary>
+    /// 地理维度聚合。与 <see cref="TopAsync"/> 不同，空值不折叠成「未知」：
+    /// 未知国家由调用方单独计数，折叠后会和地图的未匹配数重复计算。
+    /// </summary>
+    private static async Task<IReadOnlyList<DimensionItemDto>> GroupGeoAsync(
+        IQueryable<ClickEvent> source,
+        Expression<Func<ClickEvent, string?>> selector,
+        int take,
+        CancellationToken cancellationToken)
+    {
+        var rows = await source
+            .GroupBy(selector)
+            .Select(g => new { Name = g.Key, Clicks = g.LongCount() })
+            .OrderByDescending(x => x.Clicks)
+            .Take(take)
+            .ToListAsync(cancellationToken)
+            .ConfigureAwait(false);
+
+        return rows
+            .Where(r => !string.IsNullOrWhiteSpace(r.Name))
+            .Select(r => new DimensionItemDto(r.Name!, r.Clicks))
             .ToList();
     }
 

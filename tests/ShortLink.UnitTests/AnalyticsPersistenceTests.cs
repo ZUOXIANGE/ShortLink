@@ -36,10 +36,10 @@ public sealed class AnalyticsPersistenceTests
             var day1 = TestData.Now.Date;
             var day2 = day1.AddDays(1);
             db.ClickEvents.AddRange(
-                TestData.CreateClick(linkId, 77, day1.AddHours(1), false, "visitor-a"),
-                TestData.CreateClick(linkId, 77, day1.AddHours(2), false, "visitor-a"),
-                TestData.CreateClick(linkId, 78, day1.AddHours(3), true, "bot-only"),
-                TestData.CreateClick(linkId, 79, day2.AddHours(1), false, "visitor-b"),
+                TestData.CreateClick(linkId, 77, day1.AddHours(1), false, "visitor-a", "CN", "广东省"),
+                TestData.CreateClick(linkId, 77, day1.AddHours(2), false, "visitor-a", "CN", "广东省"),
+                TestData.CreateClick(linkId, 78, day1.AddHours(3), true, "bot-only", "CN", "广东省"),
+                TestData.CreateClick(linkId, 79, day2.AddHours(1), false, "visitor-b", "US"),
                 TestData.CreateClick(linkId, 79, day2.AddHours(2), true, "bot-only-today"));
             await db.SaveChangesAsync(TestContext.Current.CancellationToken);
         }
@@ -58,6 +58,13 @@ public sealed class AnalyticsPersistenceTests
             Assert.Equal((3L, 1L), (stats.Trend[0].Clicks, stats.Trend[0].UniqueVisitors));
             Assert.Equal((2L, 1L), (stats.Trend[1].Clicks, stats.Trend[1].UniqueVisitors));
 
+            // 地理维度不截断到 Top 8，且空国家单独计未知，不能与聚合项重复。
+            Assert.Equal(3, stats.Countries.Single(country => country.Name == "CN").Clicks);
+            Assert.Equal(1, stats.Countries.Single(country => country.Name == "US").Clicks);
+            Assert.Equal(3, stats.Provinces.Single(province => province.Name == "广东省").Clicks);
+            Assert.Equal(1, stats.UnknownCountryClicks);
+            Assert.Equal(5, stats.Countries.Sum(country => country.Clicks) + stats.UnknownCountryClicks);
+
             var recent = await repository.GetRecentClicksAsync(linkId, 10, TestContext.Current.CancellationToken);
             Assert.All(recent, click => Assert.NotNull(click.RouteId));
 
@@ -74,6 +81,41 @@ public sealed class AnalyticsPersistenceTests
             Assert.Equal(99, dashboard.TotalClicks);
             Assert.Equal(1, dashboard.UniqueVisitorsToday);
             Assert.Equal(1, dashboard.Trend[1].UniqueVisitors);
+        }
+    }
+
+    [Fact]
+    public async Task Analytics_Should_Keep_All_Country_Buckets_For_Map()
+    {
+        await using var database = await ClickSqliteTestDatabase.CreateAsync();
+        long linkId;
+        await using (var db = database.CreateContext())
+        {
+            var link = TestData.CreateLink("geo-map");
+            db.Links.Add(link);
+            await db.SaveChangesAsync(TestContext.Current.CancellationToken);
+            linkId = link.Id;
+
+            db.ClickEvents.AddRange(Enumerable.Range(0, 12)
+                .Select(index => TestData.CreateClick(
+                    linkId,
+                    null,
+                    TestData.Now.AddMinutes(index),
+                    false,
+                    $"visitor-{index}",
+                    $"C{index:D2}")));
+            await db.SaveChangesAsync(TestContext.Current.CancellationToken);
+        }
+
+        await using (var db = database.CreateContext())
+        {
+            var repository = new AnalyticsRepository(db);
+            var today = DateOnly.FromDateTime(TestData.Now.Date);
+            var stats = await repository.GetLinkStatsAsync(linkId, today, today, TestContext.Current.CancellationToken);
+
+            Assert.Equal(12, stats.Countries.Count);
+            Assert.Equal(12, stats.Countries.Sum(country => country.Clicks));
+            Assert.Equal(0, stats.UnknownCountryClicks);
         }
     }
 

@@ -63,6 +63,8 @@ public sealed class AnalyticsService(
             aggregate.Browsers,
             aggregate.OperatingSystems,
             aggregate.Countries,
+            aggregate.Provinces,
+            aggregate.UnknownCountryClicks,
             variants);
     }
 

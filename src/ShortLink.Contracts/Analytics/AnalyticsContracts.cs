@@ -35,6 +35,8 @@ public sealed record LinkStatsDto(
     IReadOnlyList<DimensionItemDto> Browsers,
     IReadOnlyList<DimensionItemDto> OperatingSystems,
     IReadOnlyList<DimensionItemDto> Countries,
+    IReadOnlyList<DimensionItemDto> Provinces,
+    long UnknownCountryClicks,
     IReadOnlyList<VariantStatDto> Variants);
 
 /// <summary>热门短链。</summary>
@@ -72,7 +74,8 @@ public sealed record ClickLogDto(
     string? OperatingSystem,
     string? Country,
     bool IsBot,
-    long? RouteId = null);
+    long? RouteId = null,
+    string? Province = null);
 
 /// <summary>
 /// 转化回调请求。调用方在服务端用短链的转化密钥对 <c>{timestamp}.{原始请求体}</c> 做 HMAC-SHA256，

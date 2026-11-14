@@ -15,7 +15,9 @@ public sealed record LinkClickAggregate(
     IReadOnlyList<DimensionItemDto> Devices,
     IReadOnlyList<DimensionItemDto> Browsers,
     IReadOnlyList<DimensionItemDto> OperatingSystems,
-    IReadOnlyList<DimensionItemDto> Countries);
+    IReadOnlyList<DimensionItemDto> Countries,
+    IReadOnlyList<DimensionItemDto> Provinces,
+    long UnknownCountryClicks);
 
 /// <summary>控制台聚合结果。</summary>
 public sealed record DashboardClickAggregate(
