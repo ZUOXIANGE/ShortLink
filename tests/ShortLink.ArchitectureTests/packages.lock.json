@@ -916,6 +916,14 @@
         "resolved": "8.6.5",
         "contentHash": "t+sUVrIwvo7UmsgHGgOG9F0GDZSRIm47u2ylH17Gvcv1q5hNEwgD5GoBlFyc0kh/pebmPyrAgvGsR/65ZBaXlg=="
       },
+      "RabbitMQ.Client": {
+        "type": "Transitive",
+        "resolved": "7.2.2",
+        "contentHash": "k4b6RnTXpLbsF96V93ooNYxgPMnoA2tEm24B6AXNJr1mG8wwNYdA1XJtgU66L5xqeGyveS7SJriRzlX3cbqQNA==",
+        "dependencies": {
+          "System.Threading.RateLimiting": "8.0.0"
+        }
+      },
       "Serilog": {
         "type": "Transitive",
         "resolved": "4.3.0",
@@ -1095,6 +1103,11 @@
         "resolved": "6.0.1",
         "contentHash": "IQ4NXP/B3Ayzvw0rDQzVTYsCKyy0Jp9KI6aYcK7UnGVlR9+Awz++TIPCQtPYfLJfOpm8ajowMR09V7quD3sEHw=="
       },
+      "System.Threading.RateLimiting": {
+        "type": "Transitive",
+        "resolved": "8.0.0",
+        "contentHash": "7mu9v0QDv66ar3DpGSZHg9NuNcxDaaAcnMULuZlaTpP9+hwXhrxNGsF5GmLkSHxFdb5bBc1TzeujsRgTrPWi+Q=="
+      },
       "System.ValueTuple": {
         "type": "Transitive",
         "resolved": "4.6.2",
@@ -1159,6 +1172,15 @@
           "Microsoft.Extensions.Logging.Abstractions": "10.0.0",
           "SQLitePCLRaw.bundle_e_sqlite3": "3.0.3",
           "Weasel.Core": "9.50.0"
+        }
+      },
+      "WolverineFx.Newtonsoft": {
+        "type": "Transitive",
+        "resolved": "6.64.0",
+        "contentHash": "p6Syrb0V8NZLlddTdYzvEpqJfNwMnKi8b3Z9LzQo4dSYkZx/I1uPs3LDr7uCT7ijbkLhAoJpjp2o/puSHOSKiA==",
+        "dependencies": {
+          "Newtonsoft.Json": "13.0.3",
+          "WolverineFx": "6.64.0"
         }
       },
       "WolverineFx.RDBMS": {
@@ -1302,6 +1324,7 @@
           "WolverineFx.Kafka": "[6.64.0, )",
           "WolverineFx.MySql": "[6.64.0, )",
           "WolverineFx.Postgresql": "[6.64.0, )",
+          "WolverineFx.RabbitMQ": "[6.64.0, )",
           "WolverineFx.RuntimeCompilation": "[6.64.0, )",
           "WolverineFx.Sqlite": "[6.64.0, )",
           "ZiggyCreatures.FusionCache": "[2.9.0, )",
@@ -1725,6 +1748,17 @@
         "dependencies": {
           "Weasel.Postgresql": "9.50.0",
           "WolverineFx.RDBMS": "6.64.0"
+        }
+      },
+      "WolverineFx.RabbitMQ": {
+        "type": "CentralTransitive",
+        "requested": "[6.64.0, )",
+        "resolved": "6.64.0",
+        "contentHash": "WNTX/kMQRKUrpqCs9gkdTKlF2r0h5H3RGUg8FACAIMOvAyMDlAaJjTupXoYUx1oS+OffwVMjLyZwy6dWt0gEDA==",
+        "dependencies": {
+          "RabbitMQ.Client": "7.2.2",
+          "WolverineFx": "6.64.0",
+          "WolverineFx.Newtonsoft": "6.64.0"
         }
       },
       "WolverineFx.RuntimeCompilation": {
