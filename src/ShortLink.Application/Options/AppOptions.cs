@@ -47,6 +47,9 @@ public sealed class RateLimitOptions
 
     /// <summary>短链访问密码：同一 IP 对同一短码每分钟允许的尝试次数。</summary>
     public int LinkPasswordPermitPerMinute { get; set; } = 10;
+
+    /// <summary>第三方开放接口：单个 API 凭据每分钟允许的请求数（凭据未单独配置时使用）。</summary>
+    public int PartnerPermitPerMinute { get; set; } = 300;
 }
 
 /// <summary>

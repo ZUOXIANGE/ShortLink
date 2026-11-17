@@ -2,6 +2,7 @@ using System.Data;
 using Microsoft.EntityFrameworkCore;
 using ShortLink.Application.Abstractions.Persistence;
 using ShortLink.Domain.Analytics;
+using ShortLink.Domain.ApiClients;
 using ShortLink.Domain.Domains;
 using ShortLink.Domain.Links;
 using ShortLink.Domain.Security;
@@ -34,6 +35,8 @@ public sealed class ShortLinkDbContext(DbContextOptions<ShortLinkDbContext> opti
 
     public DbSet<WorkspaceMember> WorkspaceMembers => Set<WorkspaceMember>();
 
+    public DbSet<ApiClient> ApiClients => Set<ApiClient>();
+
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         modelBuilder.ApplyConfigurationsFromAssembly(typeof(ShortLinkDbContext).Assembly);
@@ -43,6 +46,9 @@ public sealed class ShortLinkDbContext(DbContextOptions<ShortLinkDbContext> opti
         {
             modelBuilder.Entity<Link>().Property(link => link.Code).UseCollation("utf8mb4_bin");
             modelBuilder.Entity<LinkRoute>().Property(route => route.Name).UseCollation("utf8mb4_bin");
+
+            // keyId 是签名认证的入口键，大小写不同必须视为不同凭据，否则数据库唯一索引口径与内存比较不一致。
+            modelBuilder.Entity<ApiClient>().Property(client => client.KeyId).UseCollation("utf8mb4_bin");
         }
 
         base.OnModelCreating(modelBuilder);

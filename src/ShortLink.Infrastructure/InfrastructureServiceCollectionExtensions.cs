@@ -38,6 +38,7 @@ public static class InfrastructureServiceCollectionExtensions
             configuration.GetSection(AnalyticsRetentionOptions.SectionName));
         services.Configure<StatisticsOptions>(configuration.GetSection(StatisticsOptions.SectionName));
         services.Configure<GeoIpOptions>(configuration.GetSection(GeoIpOptions.SectionName));
+        services.Configure<PartnerApiOptions>(configuration.GetSection(PartnerApiOptions.SectionName));
 
         var database = configuration.GetSection(DatabaseOptions.SectionName).Get<DatabaseOptions>()
                        ?? new DatabaseOptions();
@@ -57,6 +58,11 @@ public static class InfrastructureServiceCollectionExtensions
         var geoIp = configuration.GetSection(GeoIpOptions.SectionName).Get<GeoIpOptions>()
                     ?? new GeoIpOptions();
         geoIp.Validate();
+
+        // 第三方凭据的加密主密钥同样在启动期校验：空密钥或长度不对会让所有密文形同明文。
+        var partnerApi = configuration.GetSection(PartnerApiOptions.SectionName).Get<PartnerApiOptions>()
+                         ?? new PartnerApiOptions();
+        partnerApi.Validate();
 
         var cache = configuration.GetSection(CacheOptions.SectionName).Get<CacheOptions>()
                     ?? new CacheOptions();
@@ -78,6 +84,7 @@ public static class InfrastructureServiceCollectionExtensions
         services.AddScoped<ISecurityRepository, SecurityRepository>();
         services.AddScoped<IConversionRepository, ConversionRepository>();
         services.AddScoped<IAnalyticsRepository, AnalyticsRepository>();
+        services.AddScoped<IApiClientRepository, ApiClientRepository>();
         services.AddScoped<DatabaseInitializer>();
 
         services.AddSingleton<IClock, SystemClock>();
@@ -92,6 +99,8 @@ public static class InfrastructureServiceCollectionExtensions
         services.AddScoped<ITokenValidator, TokenValidator>();
         services.AddSingleton<ISecretGenerator, CryptoSecretGenerator>();
         services.AddSingleton<ISignatureVerifier, HmacSignatureVerifier>();
+        services.AddSingleton<IApiSecretProtector, AesGcmApiSecretProtector>();
+        services.AddScoped<IApiClientAuthenticator, ApiClientAuthenticator>();
 
         // 消息总线：点击批量落库与领域事件都从这里走。
         // 必须在 DbContext 注册之后装配——handler 依赖 scoped 的 ShortLinkDbContext。
@@ -134,6 +143,7 @@ public static class InfrastructureServiceCollectionExtensions
         if (!string.IsNullOrWhiteSpace(cache.RedisConnectionString))
         {
             services.AddSingleton<IClickQuota, RedisClickQuota>();
+            services.AddSingleton<IApiNonceStore, RedisApiNonceStore>();
 
             services.AddStackExchangeRedisCache(options =>
             {
@@ -153,6 +163,7 @@ public static class InfrastructureServiceCollectionExtensions
         else
         {
             services.AddSingleton<IClickQuota, InMemoryClickQuota>();
+            services.AddSingleton<IApiNonceStore, MemoryApiNonceStore>();
         }
 
         return services;

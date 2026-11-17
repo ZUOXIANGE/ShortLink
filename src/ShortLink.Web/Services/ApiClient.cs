@@ -6,6 +6,7 @@ using ShortLink.Contracts.Analytics;
 using ShortLink.Contracts.Auth;
 using ShortLink.Contracts.Domains;
 using ShortLink.Contracts.Links;
+using ShortLink.Contracts.Partner;
 using ShortLink.Contracts.Security;
 using ShortLink.Contracts.Users;
 
@@ -172,6 +173,21 @@ public sealed class ApiClient(
 
     public Task<ApiResponse<object?>> ResetPasswordAsync(long id, ResetPasswordRequest request)
         => PostAsync<object?>($"api/v1/users/{id}/reset-password", request);
+
+    public Task<ApiResponse<IReadOnlyList<ApiClientDto>>> GetApiClientsAsync()
+        => GetAsync<IReadOnlyList<ApiClientDto>>("api/v1/api-clients");
+
+    public Task<ApiResponse<CreateApiClientResponse>> CreateApiClientAsync(CreateApiClientRequest request)
+        => PostAsync<CreateApiClientResponse>("api/v1/api-clients", request);
+
+    public Task<ApiResponse<ApiClientDto>> UpdateApiClientAsync(long id, UpdateApiClientRequest request)
+        => SendAsync<ApiClientDto>(HttpMethod.Put, $"api/v1/api-clients/{id}", request);
+
+    public Task<ApiResponse<RotateApiClientSecretResponse>> RotateApiClientSecretAsync(long id)
+        => PostAsync<RotateApiClientSecretResponse>($"api/v1/api-clients/{id}/rotate", null);
+
+    public Task<ApiResponse<object?>> RevokeApiClientAsync(long id)
+        => PostAsync<object?>($"api/v1/api-clients/{id}/revoke", null);
 
     private static string BuildLinkQuery(LinkQuery query)
     {
@@ -380,3 +396,6 @@ public sealed record DownloadResult(
 {
     public static DownloadResult Fail(string error) => new(false, null, null, error);
 }
+
+/// <summary>创建 / 轮换凭据后一次性展示的明文 secret。</summary>
+public sealed record IssuedApiClientSecret(string Name, string KeyId, string Secret);

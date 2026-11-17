@@ -4,6 +4,7 @@ using ShortLink.Application.Analytics;
 using ShortLink.Application.Auth;
 using ShortLink.Application.Domains;
 using ShortLink.Application.Links;
+using ShortLink.Application.Partner;
 using ShortLink.Application.Redirection;
 using ShortLink.Application.Security;
 using ShortLink.Application.Users;
@@ -12,6 +13,7 @@ using ShortLink.Application.Workspaces;
 using ShortLink.Contracts.Auth;
 using ShortLink.Contracts.Domains;
 using ShortLink.Contracts.Links;
+using ShortLink.Contracts.Partner;
 using ShortLink.Contracts.Security;
 using ShortLink.Contracts.Users;
 
@@ -34,6 +36,8 @@ public static class ApplicationServiceCollectionExtensions
         services.AddScoped<IValidator<UpdateUserRequest>, UpdateUserRequestValidator>();
         services.AddScoped<IValidator<ResetPasswordRequest>, ResetPasswordRequestValidator>();
         services.AddScoped<IValidator<AbuseReportRequest>, AbuseReportRequestValidator>();
+        services.AddScoped<IValidator<CreateApiClientRequest>, CreateApiClientRequestValidator>();
+        services.AddScoped<IValidator<UpdateApiClientRequest>, UpdateApiClientRequestValidator>();
 
         services.AddScoped<WorkspaceContext>();
 
@@ -48,6 +52,7 @@ public static class ApplicationServiceCollectionExtensions
         services.AddScoped<ConversionService>();
         services.AddScoped<UserService>();
         services.AddScoped<SecurityService>();
+        services.AddScoped<ApiClientService>();
 
         return services;
     }

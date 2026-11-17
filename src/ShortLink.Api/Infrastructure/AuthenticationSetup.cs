@@ -21,7 +21,12 @@ public static class AuthenticationSetup
     {
         services
             .AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
-            .AddJwtBearer();
+            .AddJwtBearer()
+            // 第三方开放接口专用方案。只在对应授权策略里显式引用，
+            // 不会成为默认方案，因此后台端点仍然只认 JWT。
+            .AddScheme<Microsoft.AspNetCore.Authentication.AuthenticationSchemeOptions, ApiKeyAuthenticationHandler>(
+                ApiKeyAuthenticationHandler.SchemeName,
+                null);
 
         // 选项在运行时解析：允许配置源（环境变量、测试宿主）在启动后再覆盖。
         services
@@ -40,48 +45,48 @@ public static class AuthenticationSetup
         }
 
         {
-                bearer.MapInboundClaims = false;
-                bearer.TokenValidationParameters = new TokenValidationParameters
-                {
-                    ValidateIssuer = true,
-                    ValidIssuer = options.Issuer,
-                    ValidateAudience = true,
-                    ValidAudience = options.Audience,
-                    ValidateIssuerSigningKey = true,
-                    IssuerSigningKey = new SymmetricSecurityKey(key),
-                    ValidateLifetime = true,
-                    ClockSkew = TimeSpan.FromSeconds(30),
-                    NameClaimType = "name",
-                    RoleClaimType = "role",
-                };
+            bearer.MapInboundClaims = false;
+            bearer.TokenValidationParameters = new TokenValidationParameters
+            {
+                ValidateIssuer = true,
+                ValidIssuer = options.Issuer,
+                ValidateAudience = true,
+                ValidAudience = options.Audience,
+                ValidateIssuerSigningKey = true,
+                IssuerSigningKey = new SymmetricSecurityKey(key),
+                ValidateLifetime = true,
+                ClockSkew = TimeSpan.FromSeconds(30),
+                NameClaimType = "name",
+                RoleClaimType = "role",
+            };
 
-                bearer.Events = new JwtBearerEvents
+            bearer.Events = new JwtBearerEvents
+            {
+                OnTokenValidated = ValidateTokenAsync,
+                OnChallenge = async context =>
                 {
-                    OnTokenValidated = ValidateTokenAsync,
-                    OnChallenge = async context =>
+                    context.HandleResponse();
+
+                    // MCP 客户端靠真实 401 触发重新认证，并按 WWW-Authenticate 做资源发现。
+                    // 这里若也归一化成 200 信封，客户端会认为连接成功、解析不出 JSON-RPC 响应，
+                    // 表现为「连上了但没有工具」。路径白名单在认证阶段管不到，只能在这里判。
+                    if (IsMcpRequest(context.HttpContext))
                     {
-                        context.HandleResponse();
-
-                        // MCP 客户端靠真实 401 触发重新认证，并按 WWW-Authenticate 做资源发现。
-                        // 这里若也归一化成 200 信封，客户端会认为连接成功、解析不出 JSON-RPC 响应，
-                        // 表现为「连上了但没有工具」。路径白名单在认证阶段管不到，只能在这里判。
-                        if (IsMcpRequest(context.HttpContext))
+                        var response = context.HttpContext.Response;
+                        response.StatusCode = StatusCodes.Status401Unauthorized;
+                        if (!response.Headers.ContainsKey("WWW-Authenticate"))
                         {
-                            var response = context.HttpContext.Response;
-                            response.StatusCode = StatusCodes.Status401Unauthorized;
-                            if (!response.Headers.ContainsKey("WWW-Authenticate"))
-                            {
-                                response.Headers.WWWAuthenticate = "Bearer";
-                            }
-
-                            return;
+                            response.Headers.WWWAuthenticate = "Bearer";
                         }
 
-                        await WriteEnvelopeAsync(
-                            context.HttpContext,
-                            BizCodes.Unauthorized,
-                            BizCodes.Describe(BizCodes.Unauthorized)).ConfigureAwait(false);
-                    },
+                        return;
+                    }
+
+                    await WriteEnvelopeAsync(
+                        context.HttpContext,
+                        BizCodes.Unauthorized,
+                        BizCodes.Describe(BizCodes.Unauthorized)).ConfigureAwait(false);
+                },
                 OnForbidden = async context =>
                 {
                     // 同上：MCP 侧保持 403 原始语义，交给客户端框架处理。

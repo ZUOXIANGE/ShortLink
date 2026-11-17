@@ -195,6 +195,103 @@ namespace ShortLink.Infrastructure.Migrations.Sqlite.Migrations
                     b.ToTable("conversion_events", (string)null);
                 });
 
+            modelBuilder.Entity("ShortLink.Domain.ApiClients.ApiClient", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("id");
+
+                    b.Property<string>("AllowedIps")
+                        .HasMaxLength(1024)
+                        .HasColumnType("TEXT")
+                        .HasColumnName("allowed_ips");
+
+                    b.Property<DateTime>("CreatedAtUtc")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("created_at_utc");
+
+                    b.Property<long?>("CreatedByUserId")
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("created_by_user_id");
+
+                    b.Property<DateTime?>("ExpiresAtUtc")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("expires_at_utc");
+
+                    b.Property<bool>("IsEnabled")
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("is_enabled");
+
+                    b.Property<string>("KeyId")
+                        .IsRequired()
+                        .HasMaxLength(48)
+                        .HasColumnType("TEXT")
+                        .HasColumnName("key_id");
+
+                    b.Property<DateTime?>("LastUsedAtUtc")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("last_used_at_utc");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("TEXT")
+                        .HasColumnName("name");
+
+                    b.Property<int?>("RateLimitPerMinute")
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("rate_limit_per_minute");
+
+                    b.Property<DateTime?>("RevokedAtUtc")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("revoked_at_utc");
+
+                    b.Property<int>("Role")
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("role");
+
+                    b.Property<string>("Scopes")
+                        .IsRequired()
+                        .HasMaxLength(512)
+                        .HasColumnType("TEXT")
+                        .HasColumnName("scopes");
+
+                    b.Property<string>("SecretCipher")
+                        .IsRequired()
+                        .HasMaxLength(1024)
+                        .HasColumnType("TEXT")
+                        .HasColumnName("secret_cipher");
+
+                    b.Property<string>("SecretHint")
+                        .IsRequired()
+                        .HasMaxLength(8)
+                        .HasColumnType("TEXT")
+                        .HasColumnName("secret_hint");
+
+                    b.Property<long>("UserId")
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("user_id");
+
+                    b.Property<long>("WorkspaceId")
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("workspace_id");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("KeyId")
+                        .IsUnique()
+                        .HasDatabaseName("ux_api_clients_key_id");
+
+                    b.HasIndex("UserId")
+                        .HasDatabaseName("ix_api_clients_user");
+
+                    b.HasIndex("WorkspaceId", "IsEnabled")
+                        .HasDatabaseName("ix_api_clients_workspace_enabled");
+
+                    b.ToTable("api_clients", (string)null);
+                });
+
             modelBuilder.Entity("ShortLink.Domain.Domains.ShortDomain", b =>
                 {
                     b.Property<long>("Id")

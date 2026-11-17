@@ -1,0 +1,319 @@
+@page "/api-clients"
+@attribute [Authorize]
+@inject ApiClient Api
+@inject IDialogService DialogService
+@inject ISnackbar Snackbar
+@inject Permissions Perms
+
+<div class="d-flex align-center justify-space-between mb-4 flex-wrap gap-2">
+    <div>
+        <h1 class="page-title">API 凭据</h1>
+        <p class="page-subtitle">
+            供第三方系统通过 HMAC 签名调用开放接口。凭据绑定工作区账号，实际权限取「账号角色」与「角色上限」的较低者，
+            再与 scope 取交集。
+        </p>
+    </div>
+    <MudButton Variant="Variant.Filled" Color="Color.Primary" StartIcon="@Icons.Material.Filled.VpnKey"
+               OnClick="CreateAsync" Disabled="@(!Perms.IsOwner || _loading)">
+        新建凭据
+    </MudButton>
+</div>
+
+@if (!Perms.IsOwner)
+{
+    <MudAlert Severity="Severity.Info" Dense="true" Class="mb-4">
+        只有所有者可以管理 API 凭据。签发凭据等于把工作区数据交给外部系统，因此不向管理员和成员开放。
+    </MudAlert>
+}
+else
+{
+    <MudAlert Severity="Severity.Normal" Dense="true" Class="mb-4">
+        第三方调用 <code>/api/v1/partner/*</code>，使用 X-Api-Key / X-Timestamp / X-Nonce / X-Signature 签名；
+        secret 只在创建或轮换时显示一次。
+    </MudAlert>
+
+    @if (_loading)
+    {
+        <MudProgressLinear Color="Color.Primary" Indeterminate="true" Class="mb-4" />
+    }
+
+    <MudTable T="ApiClientDto" Items="_clients" Dense="true" Hover="true" Elevation="0"
+              Style="border:1px solid #F0E4E6;border-radius:14px;overflow:hidden;">
+        <HeaderContent>
+            <MudTh>凭据</MudTh>
+            <MudTh>绑定账号</MudTh>
+            <MudTh>角色上限</MudTh>
+            <MudTh>权限范围</MudTh>
+            <MudTh>状态</MudTh>
+            <MudTh>最近使用</MudTh>
+            <MudTh>操作</MudTh>
+        </HeaderContent>
+        <RowTemplate>
+            <MudTd DataLabel="凭据">
+                <div class="name">@context.Name</div>
+                <div class="meta mono">@context.KeyId</div>
+                <div class="meta mono">@context.SecretPreview</div>
+            </MudTd>
+            <MudTd DataLabel="绑定账号">
+                <div>@context.UserName</div>
+                <div class="meta">ID @context.UserId</div>
+            </MudTd>
+            <MudTd DataLabel="角色上限">
+                <MudChip T="string" Size="Size.Small" Color="@RoleColor(context.Role)">
+                    @Permissions.RoleDisplayName(context.Role)
+                </MudChip>
+            </MudTd>
+            <MudTd DataLabel="权限范围">
+                <div class="scopes">
+                    @foreach (var scope in context.Scopes)
+                    {
+                        <MudChip T="string" Size="Size.Small" Color="@ApiScopeDisplay.ChipColor(scope)">@scope</MudChip>
+                    }
+                </div>
+            </MudTd>
+            <MudTd DataLabel="状态">
+                <MudChip T="string" Size="Size.Small" Color="@StatusOf(context).Color">
+                    @StatusOf(context).Text
+                </MudChip>
+                <div class="meta">@ExpiryText(context)</div>
+            </MudTd>
+            <MudTd DataLabel="最近使用">
+                @(context.LastUsedAtUtc?.ToLocalTime().ToString("yyyy-MM-dd HH:mm") ?? "从未使用")
+            </MudTd>
+            <MudTd DataLabel="操作">
+                <MudMenu Icon="@Icons.Material.Filled.MoreVert" Size="Size.Small" Dense="true">
+                    <MudMenuItem Disabled="@context.RevokedAtUtc.HasValue" OnClick="@(() => EditAsync(context))">
+                        编辑
+                    </MudMenuItem>
+                    <MudMenuItem Disabled="@context.RevokedAtUtc.HasValue" OnClick="@(() => RotateAsync(context))">
+                        轮换 secret
+                    </MudMenuItem>
+                    <MudMenuItem Disabled="@context.RevokedAtUtc.HasValue" OnClick="@(() => RevokeAsync(context))">
+                        吊销
+                    </MudMenuItem>
+                </MudMenu>
+            </MudTd>
+        </RowTemplate>
+        <NoRecordsContent>
+            <MudText Typo="Typo.body2" Class="meta">还没有 API 凭据，点击右上角「新建凭据」开始。</MudText>
+        </NoRecordsContent>
+    </MudTable>
+}
+
+@code {
+    private IReadOnlyList<ApiClientDto> _clients = [];
+    private IReadOnlyList<ManagedUserDto> _users = [];
+    private bool _loading;
+
+    protected override async Task OnInitializedAsync()
+    {
+        if (!Perms.IsOwner)
+        {
+            return;
+        }
+
+        await LoadAsync();
+    }
+
+    private async Task LoadAsync()
+    {
+        _loading = true;
+        try
+        {
+            var response = await Api.GetApiClientsAsync();
+            if (response.Code != BizCodes.Success || response.Data is null)
+            {
+                Api.NotifyIfFailed(response);
+                _clients = [];
+                return;
+            }
+
+            _clients = response.Data;
+        }
+        finally
+        {
+            _loading = false;
+        }
+    }
+
+    private async Task LoadUsersAsync()
+    {
+        if (_users.Count > 0)
+        {
+            return;
+        }
+
+        var response = await Api.QueryUsersAsync(new UserQuery { Page = 1, PageSize = 200, IsEnabled = true });
+        if (response.Code == BizCodes.Success && response.Data is not null)
+        {
+            _users = response.Data.Items;
+        }
+    }
+
+    private async Task CreateAsync()
+    {
+        await LoadUsersAsync();
+        if (_users.Count == 0)
+        {
+            Snackbar.Add("请先创建至少一个启用的工作区账号", Severity.Warning);
+            return;
+        }
+
+        var dialog = await DialogService.ShowAsync<ApiClientEditDialog>(
+            "新建 API 凭据",
+            new DialogParameters<ApiClientEditDialog> { { x => x.Users, _users } },
+            new DialogOptions { MaxWidth = MaxWidth.Small, FullWidth = true });
+
+        var result = await dialog.Result;
+        if (result is not { Canceled: false })
+        {
+            return;
+        }
+
+        if (result.Data is IssuedApiClientSecret secret)
+        {
+            await ShowSecretAsync(secret);
+        }
+
+        await LoadAsync();
+    }
+
+    private async Task EditAsync(ApiClientDto client)
+    {
+        await LoadUsersAsync();
+
+        var parameters = new DialogParameters<ApiClientEditDialog>
+        {
+            { x => x.Client, client },
+            { x => x.Users, _users },
+        };
+
+        var dialog = await DialogService.ShowAsync<ApiClientEditDialog>(
+            "编辑 API 凭据",
+            parameters,
+            new DialogOptions { MaxWidth = MaxWidth.Small, FullWidth = true });
+
+        var result = await dialog.Result;
+        if (result is { Canceled: false })
+        {
+            await LoadAsync();
+        }
+    }
+
+    private async Task RotateAsync(ApiClientDto client)
+    {
+        var confirmed = await DialogService.ShowMessageBoxAsync(
+            "轮换 secret",
+            $"轮换后 {client.Name} 的旧 secret 立即失效，所有使用该凭据的集成方都必须同步更新。确定继续吗？",
+            yesText: "轮换",
+            cancelText: "取消");
+
+        if (confirmed != true)
+        {
+            return;
+        }
+
+        var response = await Api.RotateApiClientSecretAsync(client.Id);
+        if (response.Code == BizCodes.Success && response.Data is not null)
+        {
+            await ShowSecretAsync(new IssuedApiClientSecret(
+                response.Data.Client.Name,
+                response.Data.Client.KeyId,
+                response.Data.Secret));
+            await LoadAsync();
+            return;
+        }
+
+        Api.NotifyIfFailed(response);
+    }
+
+    private async Task RevokeAsync(ApiClientDto client)
+    {
+        var confirmed = await DialogService.ShowMessageBoxAsync(
+            "吊销凭据",
+            $"吊销后 {client.Name} 立即无法调用开放接口，且不能恢复。确定继续吗？",
+            yesText: "吊销",
+            cancelText: "取消");
+
+        if (confirmed != true)
+        {
+            return;
+        }
+
+        var response = await Api.RevokeApiClientAsync(client.Id);
+        if (response.Code == BizCodes.Success)
+        {
+            Snackbar.Add("凭据已吊销", Severity.Success);
+            await LoadAsync();
+            return;
+        }
+
+        Api.NotifyIfFailed(response);
+    }
+
+    private async Task ShowSecretAsync(IssuedApiClientSecret secret)
+    {
+        await DialogService.ShowAsync<ApiClientSecretDialog>(
+            "凭据 secret",
+            new DialogParameters<ApiClientSecretDialog> { { x => x.Secret, secret } },
+            new DialogOptions
+            {
+                MaxWidth = MaxWidth.Small,
+                FullWidth = true,
+                CloseOnEscapeKey = false,
+                BackdropClick = false,
+            });
+    }
+
+    private static Color RoleColor(string role) => role switch
+    {
+        "owner" => Color.Secondary,
+        "admin" => Color.Primary,
+        "member" => Color.Info,
+        _ => Color.Default,
+    };
+
+    private static (string Text, Color Color) StatusOf(ApiClientDto client)
+    {
+        if (client.RevokedAtUtc is not null)
+        {
+            return ("已吊销", Color.Dark);
+        }
+
+        if (client.ExpiresAtUtc is { } expiresAt && expiresAt <= DateTime.UtcNow)
+        {
+            return ("已过期", Color.Warning);
+        }
+
+        return client.IsEnabled ? ("启用", Color.Success) : ("停用", Color.Default);
+    }
+
+    private static string ExpiryText(ApiClientDto client)
+        => client.ExpiresAtUtc is { } expiresAt
+            ? $"至 {expiresAt.ToLocalTime():yyyy-MM-dd}"
+            : "永不过期";
+}
+
+<style>
+    .name {
+        font-weight: 600;
+        color: #2b1214;
+    }
+
+    .meta {
+        font-size: 11px;
+        color: #9b8085;
+        margin-top: 2px;
+    }
+
+    .mono {
+        font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    }
+
+    .scopes {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 4px;
+        max-width: 260px;
+    }
+</style>

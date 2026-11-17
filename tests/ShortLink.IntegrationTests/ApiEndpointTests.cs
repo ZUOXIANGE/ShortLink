@@ -44,6 +44,8 @@ public sealed class ApiFactory : WebApplicationFactory<Program>
                 ["RateLimit:AuthPermitPerMinute"] = "1000",
                 ["RateLimit:ConversionPermitPerMinute"] = "1000",
                 ["RateLimit:AbusePermitPerMinute"] = "1000",
+                ["RateLimit:PartnerPermitPerMinute"] = "1000",
+                ["PartnerApi:SecretEncryptionKey"] = "c2hvcnRsaW5rLWRldi1wYXJ0bmVyLXNlY3JldC0zMmI=",
                 // MCP 默认关闭（生产要显式开启），测试宿主里打开以便用真实客户端打通端点。
                 ["Mcp:Enabled"] = "true",
                 ["Mcp:Path"] = "/mcp",

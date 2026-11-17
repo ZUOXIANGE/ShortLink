@@ -1,3 +1,6 @@
+using System.Security.Claims;
+using Microsoft.AspNetCore.Authorization;
+using ShortLink.Contracts.Partner;
 using ShortLink.Domain.Users;
 
 namespace ShortLink.Api.Infrastructure;
@@ -22,7 +25,7 @@ public static class AuthorizationSetup
 
     public static IServiceCollection AddShortLinkAuthorization(this IServiceCollection services)
     {
-        services.AddAuthorizationBuilder()
+        var builder = services.AddAuthorizationBuilder()
             .AddPolicy(Viewer, policy => policy
                 .RequireAuthenticatedUser())
             .AddPolicy(Writer, policy => policy
@@ -32,6 +35,53 @@ public static class AuthorizationSetup
             .AddPolicy(Owner, policy => policy
                 .RequireRole(UserRoles.Owner));
 
+        AddPartnerPolicies(builder);
+
         return services;
     }
+
+    /// <summary>
+    /// 第三方策略显式绑定 <c>ApiKey</c> 方案：JWT 用户调 Partner 端点会得到 401，
+    /// 签名凭据调后台端点同样 401，避免两套身份互相越权。
+    /// </summary>
+    private static void AddPartnerPolicies(AuthorizationBuilder builder)
+    {
+        builder
+            .AddPolicy(ApiPolicies.LinksRead, policy => policy
+                .AddAuthenticationSchemes(ApiKeyAuthenticationHandler.SchemeName)
+                .RequireAuthenticatedUser()
+                .RequireAssertion(context => HasScope(context.User, ApiScopes.LinksRead)))
+            .AddPolicy(ApiPolicies.LinksWrite, policy => policy
+                .AddAuthenticationSchemes(ApiKeyAuthenticationHandler.SchemeName)
+                .RequireAuthenticatedUser()
+                .RequireRole(UserRoles.Owner, UserRoles.Admin, UserRoles.Member)
+                .RequireAssertion(context => HasScope(context.User, ApiScopes.LinksWrite)))
+            .AddPolicy(ApiPolicies.LinksDelete, policy => policy
+                .AddAuthenticationSchemes(ApiKeyAuthenticationHandler.SchemeName)
+                .RequireAuthenticatedUser()
+                .RequireRole(UserRoles.Owner, UserRoles.Admin, UserRoles.Member)
+                .RequireAssertion(context => HasScope(context.User, ApiScopes.LinksDelete)))
+            .AddPolicy(ApiPolicies.AnalyticsRead, policy => policy
+                .AddAuthenticationSchemes(ApiKeyAuthenticationHandler.SchemeName)
+                .RequireAuthenticatedUser()
+                .RequireAssertion(context => HasScope(context.User, ApiScopes.AnalyticsRead)));
+    }
+
+    private static bool HasScope(ClaimsPrincipal user, string scope)
+        => user
+            .FindAll("scope")
+            .SelectMany(claim => claim.Value.Split(' ', StringSplitOptions.RemoveEmptyEntries))
+            .Contains(scope, StringComparer.Ordinal);
+}
+
+/// <summary>第三方开放接口的授权策略名。</summary>
+public static class ApiPolicies
+{
+    public const string LinksRead = "api:links:read";
+
+    public const string LinksWrite = "api:links:write";
+
+    public const string LinksDelete = "api:links:delete";
+
+    public const string AnalyticsRead = "api:analytics:read";
 }

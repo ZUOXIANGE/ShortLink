@@ -88,6 +88,17 @@ Api → Infrastructure → Application → Domain
 - `/mcp` 不进信封归一化，但**有两道关**：`ResponseNormalizationMiddleware` 白名单 + `JwtBearerEvents.OnChallenge/OnForbidden` 里判路径。401/403 是认证事件直接写的，绕过中间件；只改一处会漏。回归测试断言真实状态码，不要断言「客户端抛异常」。
 - 高危工具标注 `Destructive = true` 并在描述里要求用户确认，不要指望模型自己谨慎。
 
+## 第三方开放 API
+
+- 入口是 `/api/v1/partner/*`，只认 HMAC 签名（`ApiKey` 方案）；后台端点只认 JWT。两套身份不能互相调用。
+- 凭据是 `api_clients`，绑定一个工作区成员账号；认证后 Claims 与 JWT 同构（`sub`/`ws`/`role`），所有用例继续走现有工作区过滤与 `LinkPolicy`，**禁止**为 Partner 另写一套权限判断或直接注入仓储。
+- 有效角色取「成员当前角色」与「凭据角色上限」的较低者；scope 与角色是 AND，不能互相替代。
+- secret 只在创建 / 轮换时返回一次；落库必须 AES-GCM 加密，`PartnerApi:SecretEncryptionKey` 缺失或长度不对时启动失败。
+- 签名固定为 `METHOD\nPATH\nCANONICAL_QUERY\nTIMESTAMP\nNONCE\nSHA256(body)`；时间窗 ±5 分钟，nonce 用单条 `SET NX EX` 原子去重。
+- 认证必须在限流之前完成（`PartnerAuthenticationMiddleware` → `UseRateLimiter` → `UseAuthorization`），否则签名失败会绕过配额直接打库。
+- 不暴露全局资源与敏感明细：Partner v1 无域名列表，统计只给聚合数据，不返回点击 IP。
+- 新增 Partner 端点必须声明 scope 策略，并在 `docs/api/partner-api.md` 补上路径、scope 与错误码。
+
 ## 前端约定
 
 - `LinkDto` 等 DTO 里凡是「更新请求全量覆盖」的字段（如 `IpAllowList`），必须回传原文，否则编辑一次就会静默清空。

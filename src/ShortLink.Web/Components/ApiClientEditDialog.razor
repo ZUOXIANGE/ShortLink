@@ -1,0 +1,277 @@
+@inject ApiClient Api
+@inject ISnackbar Snackbar
+@inject Permissions Perms
+
+<MudDialog>
+    <TitleContent>
+        <MudText Typo="Typo.h6">@(IsEdit ? "编辑 API 凭据" : "新建 API 凭据")</MudText>
+    </TitleContent>
+    <DialogContent>
+        <MudStack Spacing="3" Class="mt-2">
+            <MudTextField @bind-Value="_name" Label="凭据名称" Variant="Variant.Outlined"
+                          Margin="Margin.Dense" Immediate="true"
+                          HelperText="用于在列表中辨识，例如「订单系统」" />
+
+            <MudSelect T="long" Value="_userId" ValueChanged="OnUserChanged"
+                       Label="绑定工作区账号" Variant="Variant.Outlined" Margin="Margin.Dense"
+                       Disabled="@IsEdit">
+                @foreach (var user in Users)
+                {
+                    <MudSelectItem T="long" Value="@user.Id">
+                        @user.UserName · @Permissions.RoleDisplayName(user.Role)
+                    </MudSelectItem>
+                }
+            </MudSelect>
+
+            @if (IsEdit)
+            {
+                <MudText Typo="Typo.caption" Class="hint">
+                    KeyId：@Client!.KeyId。绑定账号创建后不可变更，需要换账号请新建凭据。
+                </MudText>
+            }
+
+            <MudSelect T="string" @bind-Value="_role" Label="角色上限"
+                       Variant="Variant.Outlined" Margin="Margin.Dense">
+                @foreach (var role in AssignableRoles)
+                {
+                    <MudSelectItem T="string" Value="@role">@Permissions.RoleDisplayName(role)</MudSelectItem>
+                }
+            </MudSelect>
+
+            <MudText Typo="Typo.caption" Class="hint">
+                实际权限取「账号当前角色」与「角色上限」的较低者；scope 与角色是 AND 关系。
+            </MudText>
+
+            <MudText Typo="Typo.subtitle2">权限范围</MudText>
+            <MudStack Spacing="0">
+                @foreach (var scope in ApiScopes.All)
+                {
+                    <MudCheckBox T="bool" Value="@_scopes.Contains(scope)"
+                                 ValueChanged="@((bool value) => ToggleScope(scope, value))"
+                                 Label="@ApiScopeDisplay.Label(scope)" Color="Color.Primary" />
+                }
+            </MudStack>
+
+            <MudNumericField T="int?" @bind-Value="_rateLimit" Label="每分钟请求上限"
+                             Variant="Variant.Outlined" Margin="Margin.Dense"
+                             HelperText="留空使用全局默认值；单个凭据独立计数" />
+
+            <MudTextField @bind-Value="_allowedIps" Label="IP 白名单"
+                          Variant="Variant.Outlined" Margin="Margin.Dense" Lines="3"
+                          HelperText="逗号或换行分隔，支持 CIDR；留空不限制来源 IP" />
+
+            <MudDatePicker @bind-Date="_expiresAt" Label="过期日期"
+                           Variant="Variant.Outlined" Margin="Margin.Dense" />
+            <MudText Typo="Typo.caption" Class="hint">留空表示永不过期。</MudText>
+
+            @if (IsEdit)
+            {
+                <MudSwitch T="bool" @bind-Value="_enabled" Color="Color.Primary" Label="启用该凭据" />
+            }
+
+            @if (!string.IsNullOrEmpty(_error))
+            {
+                <MudAlert Severity="Severity.Error" Dense="true">@_error</MudAlert>
+            }
+        </MudStack>
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="Cancel">取消</MudButton>
+        <MudButton Color="Color.Primary" Variant="Variant.Filled" OnClick="SubmitAsync" Disabled="_busy">
+            @(IsEdit ? "保存" : "创建")
+        </MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [CascadingParameter]
+    private IMudDialogInstance MudDialog { get; set; } = default!;
+
+    [Parameter]
+    public ApiClientDto? Client { get; set; }
+
+    [Parameter]
+    public IReadOnlyList<ManagedUserDto> Users { get; set; } = [];
+
+    private string _name = string.Empty;
+    private long _userId;
+    private string _role = "member";
+    private readonly HashSet<string> _scopes = new(StringComparer.Ordinal);
+    private int? _rateLimit;
+    private string _allowedIps = string.Empty;
+    private DateTime? _expiresAt;
+    private bool _enabled = true;
+    private string? _error;
+    private bool _busy;
+
+    private bool IsEdit => Client is not null;
+
+    private ManagedUserDto? SelectedUser => Users.FirstOrDefault(user => user.Id == _userId);
+
+    /// <summary>只能授予不高于绑定账号当前角色的上限。</summary>
+    private IEnumerable<string> AssignableRoles => new[] { "viewer", "member", "admin", "owner" }
+        .Where(role => SelectedUser is null || Permissions.Rank(role) <= Permissions.Rank(SelectedUser.Role));
+
+    protected override void OnInitialized()
+    {
+        if (Client is null)
+        {
+            _userId = Users.FirstOrDefault(user => user.Role == "owner")?.Id
+                      ?? Users.FirstOrDefault()?.Id
+                      ?? 0;
+            ClampRole();
+            _scopes.Add(ApiScopes.LinksRead);
+            return;
+        }
+
+        _name = Client.Name;
+        _userId = Client.UserId;
+        _role = Client.Role;
+        _rateLimit = Client.RateLimitPerMinute;
+        _allowedIps = Client.AllowedIps ?? string.Empty;
+        _expiresAt = Client.ExpiresAtUtc?.ToLocalTime();
+        _enabled = Client.IsEnabled;
+
+        foreach (var scope in Client.Scopes)
+        {
+            _scopes.Add(scope);
+        }
+
+        ClampRole();
+    }
+
+    private Task OnUserChanged(long userId)
+    {
+        _userId = userId;
+        ClampRole();
+        return Task.CompletedTask;
+    }
+
+    private void ClampRole()
+    {
+        var maxRole = SelectedUser?.Role;
+        if (maxRole is not null && Permissions.Rank(_role) > Permissions.Rank(maxRole))
+        {
+            _role = maxRole;
+        }
+    }
+
+    private void ToggleScope(string scope, bool selected)
+    {
+        if (selected)
+        {
+            _scopes.Add(scope);
+        }
+        else
+        {
+            _scopes.Remove(scope);
+        }
+    }
+
+    private void Cancel() => MudDialog.Cancel();
+
+    private async Task SubmitAsync()
+    {
+        _error = null;
+
+        if (string.IsNullOrWhiteSpace(_name))
+        {
+            _error = "请填写凭据名称";
+            return;
+        }
+
+        if (_userId <= 0 || SelectedUser is null)
+        {
+            _error = "请选择绑定的工作区账号";
+            return;
+        }
+
+        if (_scopes.Count == 0)
+        {
+            _error = "至少授予一个 scope";
+            return;
+        }
+
+        if (_rateLimit is <= 0)
+        {
+            _error = "每分钟请求上限必须大于 0，或留空使用默认值";
+            return;
+        }
+
+        if (_expiresAt is { } expiresAt && expiresAt.Date < DateTime.Today)
+        {
+            _error = "过期日期不能早于今天";
+            return;
+        }
+
+        _busy = true;
+        try
+        {
+            var scopes = _scopes.OrderBy(scope => scope, StringComparer.Ordinal).ToList();
+
+            if (Client is null)
+            {
+                var response = await Api.CreateApiClientAsync(new CreateApiClientRequest
+                {
+                    Name = _name.Trim(),
+                    UserId = _userId,
+                    Role = _role,
+                    Scopes = scopes,
+                    RateLimitPerMinute = _rateLimit,
+                    AllowedIps = string.IsNullOrWhiteSpace(_allowedIps) ? null : _allowedIps.Trim(),
+                    ExpiresAtUtc = _expiresAt?.Date.ToUniversalTime(),
+                });
+
+                if (response.Code == BizCodes.Success && response.Data is not null)
+                {
+                    Snackbar.Add("凭据已创建", Severity.Success);
+                    MudDialog.Close(DialogResult.Ok<IssuedApiClientSecret?>(new IssuedApiClientSecret(
+                        response.Data.Client.Name,
+                        response.Data.Client.KeyId,
+                        response.Data.Secret)));
+                    return;
+                }
+
+                _error = FirstError(response) ?? ErrorMessages.From(response.Code, response.Msg);
+                return;
+            }
+
+            var update = await Api.UpdateApiClientAsync(Client.Id, new UpdateApiClientRequest
+            {
+                Name = _name.Trim(),
+                Role = _role,
+                Scopes = scopes,
+                RateLimitPerMinute = _rateLimit,
+                AllowedIps = _allowedIps.Trim(),
+                ExpiresAtUtc = _expiresAt?.Date.ToUniversalTime(),
+                ClearExpiry = _expiresAt is null && Client.ExpiresAtUtc is not null,
+                IsEnabled = _enabled,
+            });
+
+            if (update.Code == BizCodes.Success)
+            {
+                Snackbar.Add("凭据已更新", Severity.Success);
+                MudDialog.Close(DialogResult.Ok<IssuedApiClientSecret?>(null));
+                return;
+            }
+
+            _error = FirstError(update) ?? ErrorMessages.From(update.Code, update.Msg);
+        }
+        finally
+        {
+            _busy = false;
+        }
+    }
+
+    private static string? FirstError<T>(ApiResponse<T> response)
+        => response.Errors is { Count: > 0 }
+            ? response.Errors.SelectMany(pair => pair.Value).FirstOrDefault()
+            : null;
+}
+
+<style>
+    .hint {
+        font-size: 12px;
+        color: #9b8085;
+    }
+</style>

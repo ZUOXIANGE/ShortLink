@@ -333,8 +333,10 @@ try
     app.UseSerilogRequestLogging();
     app.UseCors();
     app.UseAuthentication();
-    app.UseAuthorization();
+    // 第三方签名必须在限流之前认证，否则认证失败的请求会绕过配额直接打库。
+    app.UseMiddleware<PartnerAuthenticationMiddleware>();
     app.UseRateLimiter();
+    app.UseAuthorization();
 
     app.MapOpenApi().WithDocumentPerVersion();
     app.MapScalarApiReference();
@@ -358,6 +360,14 @@ try
     api.MapUserEndpoints();
     api.MapSecurityEndpoints();
     api.MapConversionEndpoints();
+    api.MapApiClientEndpoints();
+
+    // ── 第三方开放接口：独立认证方案，不能挂在/api 组下 ───────
+    // api 组已经 RequireAuthorization()（默认 JWT），挂进去会让签名凭据被 JWT 要求卡住。
+    var partner = app
+        .MapGroup("/api/v{version:apiVersion}")
+        .WithApiVersionSet(apiVersionSet);
+    partner.MapPartnerEndpoints();
 
     // ── MCP：Streamable HTTP 传输 ───────────────────────────
     // 端点要求登录，工具内部再按角色判定（viewer 只能读，写工具要 member 及以上）；
@@ -372,6 +382,7 @@ try
     }
 
     LogCacheTopology(app);
+    LogPartnerAuthTopology(app);
 
     // 短码跳转：单段路径，必须在所有前缀路由之后注册。
     app.MapRedirectEndpoints();
@@ -432,4 +443,22 @@ static void LogCacheTopology(WebApplication app)
     {
         Log.Information(message, topology.LinkTtlSeconds);
     }
+}
+
+/// <summary>
+/// 第三方签名的重放保护形态：没有 Redis 时 nonce 只在单个实例内有效。
+/// 这和多实例缓存失效一样，不会报错、不会让探针变红，只会在跨实例重放时静默放行，
+/// 所以启动期必须显式说出来。
+/// </summary>
+static void LogPartnerAuthTopology(WebApplication app)
+{
+    var nonces = app.Services.GetRequiredService<IApiNonceStore>();
+
+    if (nonces.IsDistributed)
+    {
+        Log.Information("第三方 API nonce 存储：redis，跨实例防重放已启用");
+        return;
+    }
+
+    Log.Warning("第三方 API nonce 存储：in-process。多实例部署时重放请求可能落到另一实例而未被拦截，请配置 Redis");
 }

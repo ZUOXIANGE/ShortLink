@@ -27,6 +27,12 @@ public static class RateLimitingSetup
     /// <summary>短链访问密码策略名，按来源 IP 与短码共同分区。</summary>
     public const string LinkPasswordPolicy = "link-password";
 
+    /// <summary>第三方开放接口策略名，按 API 凭据分区。</summary>
+    public const string PartnerPolicy = "partner";
+
+    /// <summary>认证处理器写入的每凭据配额（分钟）；限流策略优先读取它。</summary>
+    public const string ApiClientRateLimitItem = "shortlink:api-client-rate-limit";
+
     public static readonly TimeSpan Window = TimeSpan.FromMinutes(1);
 
     public static IServiceCollection AddShortLinkRateLimiting(this IServiceCollection services)
@@ -79,6 +85,14 @@ public static class RateLimitingSetup
                     LinkPasswordPolicy,
                     limits.LinkPasswordPermitPerMinute,
                     LinkPasswordKey));
+
+                // 第三方接口按凭据分区：同一集成方的多个出口 IP 共用一份配额，
+                // 同时不会因为共用出口 IP 被其他第三方挤占。配额可逐凭据覆盖。
+                options.AddPolicy(PartnerPolicy, context => CreatePartition(
+                    context,
+                    PartnerPolicy,
+                    ResolvePartnerPermit(context),
+                    PartnerKey));
             });
 
         // MCP 按「调用者」分区：AI 客户端通常从同一出口 IP、用同一账号批量调用，
@@ -117,6 +131,28 @@ public static class RateLimitingSetup
     {
         var code = context.Request.RouteValues["code"]?.ToString()?.Trim();
         return $"{ClientKey(context)}:code:{(string.IsNullOrEmpty(code) ? "unknown" : code)}";
+    }
+
+    /// <summary>第三方分区键：优先用凭据标识，未认证时回落 IP（仅兜底）。</summary>
+    private static string PartnerKey(HttpContext context)
+    {
+        var clientId = context.User?.FindFirst("client_id")?.Value;
+        return string.IsNullOrWhiteSpace(clientId) ? ClientKey(context) : $"client:{clientId}";
+    }
+
+    /// <summary>凭据单独的配额优先，否则取全局默认值。</summary>
+    private static int ResolvePartnerPermit(HttpContext context)
+    {
+        if (context.Items.TryGetValue(ApiClientRateLimitItem, out var value)
+            && value is int limit
+            && limit > 0)
+        {
+            return limit;
+        }
+
+        return Math.Max(
+            context.RequestServices.GetRequiredService<IOptions<RateLimitOptions>>().Value.PartnerPermitPerMinute,
+            1);
     }
 
     private static RateLimiter CreateLimiter(IServiceProvider services, string policy, string partitionKey, int permitLimit)

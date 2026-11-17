@@ -118,6 +118,31 @@ public static class BizCodes
     // ── 导出 17xxx ───────────────────────────────────────────
     public const int ExportRangeTooLarge = 17001;
 
+    // ── 第三方 API 18xxx ─────────────────────────────────────
+    /// <summary>API 凭据不存在、已停用、已过期或绑定账号失效。</summary>
+    public const int ApiKeyInvalid = 18001;
+
+    /// <summary>请求签名校验失败。</summary>
+    public const int ApiSignatureInvalid = 18002;
+
+    /// <summary>请求时间戳超出允许窗口。</summary>
+    public const int ApiTimestampExpired = 18003;
+
+    /// <summary>nonce 已使用，疑似重放。</summary>
+    public const int ApiNonceReplayed = 18004;
+
+    /// <summary>凭据缺少所需 scope 或角色权限。</summary>
+    public const int ApiScopeDenied = 18005;
+
+    /// <summary>来源 IP 不在白名单。</summary>
+    public const int ApiIpNotAllowed = 18006;
+
+    /// <summary>请求体超过大小限制。</summary>
+    public const int ApiBodyTooLarge = 18007;
+
+    /// <summary>API 凭据不存在。</summary>
+    public const int ApiClientNotFound = 18008;
+
     /// <summary>把业务码映射为可展示的中文文案（仅用于未携带 msg 的场景）。</summary>
     public static string Describe(int code) => code switch
     {
@@ -174,6 +199,14 @@ public static class BizCodes
         SecurityEventNotFound => "安全事件不存在",
         AbuseReportInvalid => "举报内容不合法",
         ExportRangeTooLarge => "导出范围过大，请缩小筛选条件",
+        ApiKeyInvalid => "API 凭据无效、已停用或已过期",
+        ApiSignatureInvalid => "请求签名校验失败",
+        ApiTimestampExpired => "请求时间戳已过期",
+        ApiNonceReplayed => "请求已被处理，请勿重放",
+        ApiScopeDenied => "凭据缺少所需权限",
+        ApiIpNotAllowed => "来源 IP 不在白名单",
+        ApiBodyTooLarge => "请求体超过大小限制",
+        ApiClientNotFound => "API 凭据不存在",
         _ => "未知业务状态",
     };
 }

@@ -86,8 +86,15 @@ var adminPassword = isPublishMode
     ? builder.AddParameter("seed-admin-password", secret: true)
     : builder.AddParameter("seed-admin-password", "Admin@123456", secret: true);
 
+// 第三方凭据 secret 的 AES-GCM 主密钥：本地固定开发值，publish 时留空由运维填。
+// 与 JWT 密钥同口径——空值会在 Api 启动期被校验拒绝，不会带着明文风险静默上线。
+var partnerApiKey = isPublishMode
+    ? builder.AddParameter("partner-api-secret-key", secret: true)
+    : builder.AddParameter("partner-api-secret-key", "c2hvcnRsaW5rLWRldi1wYXJ0bmVyLXNlY3JldC0zMmI=", secret: true);
+
 api.WithEnvironment("Jwt__SigningKey", jwtSigningKey)
     .WithEnvironment("Seed__AdminPassword", adminPassword)
+    .WithEnvironment("PartnerApi__SecretEncryptionKey", partnerApiKey)
     .WithEnvironment("Cors__AllowedOrigins__0", webPublicOrigin);
 
 // 短链对外域名：本机就是 localhost:5080；部署到服务器必须换成真实域名，

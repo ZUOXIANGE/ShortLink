@@ -35,6 +35,10 @@
                 <MudNavLink Href="/security" Icon="@Icons.Material.Filled.Shield">安全事件</MudNavLink>
                 <MudNavLink Href="/users" Icon="@Icons.Material.Filled.ManageAccounts">账号与角色</MudNavLink>
             }
+            @if (Perms.IsOwner)
+            {
+                <MudNavLink Href="/api-clients" Icon="@Icons.Material.Filled.VpnKey">API 凭据</MudNavLink>
+            }
         </MudNavMenu>
     </MudDrawer>
 
