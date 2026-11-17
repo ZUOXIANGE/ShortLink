@@ -10,11 +10,11 @@ namespace ShortLink.Api.Endpoints;
 /// 转化回调端点。必须按「原始请求体」验签，所以这里不用参数绑定，
 /// 而是先读字符串、再反序列化，否则任何格式差异都会导致签名不匹配。
 /// </summary>
-public static class ConversionEndpoints
+public sealed class ConversionEndpoints : IApiEndpointModule
 {
     private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web);
 
-    public static RouteGroupBuilder MapConversionEndpoints(this RouteGroupBuilder group)
+    public static void MapEndpoints(RouteGroupBuilder group)
     {
         group.MapPost("/conversions", async (
                 HttpContext http,
@@ -63,7 +63,5 @@ public static class ConversionEndpoints
             .WithTags("转化")
             .WithSummary("转化回调（签名 + 幂等）")
             .Produces<ApiResponse<ConversionResultDto>>();
-
-        return group;
     }
 }

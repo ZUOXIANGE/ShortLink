@@ -5,9 +5,9 @@ using ShortLink.Contracts.Auth;
 
 namespace ShortLink.Api.Endpoints;
 
-public static class AuthEndpoints
+public sealed class AuthEndpoints : IApiEndpointModule
 {
-    public static RouteGroupBuilder MapAuthEndpoints(this RouteGroupBuilder group)
+    public static void MapEndpoints(RouteGroupBuilder group)
     {
         var auth = group.MapGroup("/auth").WithTags("认证");
 
@@ -35,7 +35,5 @@ public static class AuthEndpoints
             .RequireAuthorization(AuthorizationSetup.Viewer)
             .WithSummary("修改当前用户密码")
             .Produces<ApiResponse<object?>>();
-
-        return group;
     }
 }

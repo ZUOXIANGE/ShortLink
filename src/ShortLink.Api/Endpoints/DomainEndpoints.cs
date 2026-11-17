@@ -5,9 +5,9 @@ using ShortLink.Contracts.Domains;
 
 namespace ShortLink.Api.Endpoints;
 
-public static class DomainEndpoints
+public sealed class DomainEndpoints : IApiEndpointModule
 {
-    public static RouteGroupBuilder MapDomainEndpoints(this RouteGroupBuilder group)
+    public static void MapEndpoints(RouteGroupBuilder group)
     {
         var domains = group.MapGroup("/domains").WithTags("域名");
 
@@ -39,7 +39,5 @@ public static class DomainEndpoints
             .RequireAuthorization(AuthorizationSetup.Manager)
             .WithSummary("删除域名（域名下仍有短链时拒绝）")
             .Produces<ApiResponse<object?>>();
-
-        return group;
     }
 }

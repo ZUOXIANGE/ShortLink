@@ -187,6 +187,12 @@
           "Serilog": "4.2.0"
         }
       },
+      "ServiceScan.SourceGenerator": {
+        "type": "Direct",
+        "requested": "[3.2.2, )",
+        "resolved": "3.2.2",
+        "contentHash": "w67H6W/37qVmT1vPB7vwYvUgSbAfdB+XW/nq3efCA3OwqPACku60hN/CTKRKB1eA5vL74+dyqQgLiZ9TFie/hA=="
+      },
       "Apache.Avro": {
         "type": "Transitive",
         "resolved": "1.12.1",

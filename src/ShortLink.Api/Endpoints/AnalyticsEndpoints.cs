@@ -5,9 +5,9 @@ using ShortLink.Contracts.Analytics;
 
 namespace ShortLink.Api.Endpoints;
 
-public static class AnalyticsEndpoints
+public sealed class AnalyticsEndpoints : IApiEndpointModule
 {
-    public static RouteGroupBuilder MapAnalyticsEndpoints(this RouteGroupBuilder group)
+    public static void MapEndpoints(RouteGroupBuilder group)
     {
         var analytics = group.MapGroup("/dashboard").WithTags("统计");
 
@@ -19,7 +19,5 @@ public static class AnalyticsEndpoints
             .RequireAuthorization(AuthorizationSetup.Viewer)
             .WithSummary("控制台总览")
             .Produces<ApiResponse<DashboardOverviewDto>>();
-
-        return group;
     }
 }

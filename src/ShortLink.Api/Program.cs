@@ -353,14 +353,8 @@ try
         .WithApiVersionSet(apiVersionSet)
         .RequireAuthorization();
 
-    api.MapAuthEndpoints();
-    api.MapDomainEndpoints();
-    api.MapLinkEndpoints();
-    api.MapAnalyticsEndpoints();
-    api.MapUserEndpoints();
-    api.MapSecurityEndpoints();
-    api.MapConversionEndpoints();
-    api.MapApiClientEndpoints();
+    // 实现 IApiEndpointModule 的端点模块由源生成器在编译期展开，新增模块无需改这里。
+    api.MapApiEndpoints();
 
     // ── 第三方开放接口：独立认证方案，不能挂在/api 组下 ───────
     // api 组已经 RequireAuthorization()（默认 JWT），挂进去会让签名凭据被 JWT 要求卡住。

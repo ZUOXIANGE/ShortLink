@@ -40,6 +40,13 @@
     <PackageVersion Include="ZiggyCreatures.FusionCache.Backplane.StackExchangeRedis" Version="2.9.0" />
     <PackageVersion Include="MaxMind.GeoIP2" Version="6.1.0" />
   </ItemGroup>
+  <ItemGroup Label="代码生成">
+    <!--
+      编译期展开端点/服务注册，替代运行期反射扫描（AOT 友好，启动无额外开销）。
+      仅作为 analyzer 使用，不参与运行时依赖。
+    -->
+    <PackageVersion Include="ServiceScan.SourceGenerator" Version="3.2.2" />
+  </ItemGroup>
   <ItemGroup Label="可观测性">
     <PackageVersion Include="Serilog.AspNetCore" Version="10.0.0" />
     <PackageVersion Include="Serilog.Sinks.Console" Version="6.1.1" />

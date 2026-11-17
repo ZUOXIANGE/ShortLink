@@ -6,9 +6,9 @@ using ShortLink.Contracts.Users;
 
 namespace ShortLink.Api.Endpoints;
 
-public static class UserEndpoints
+public sealed class UserEndpoints : IApiEndpointModule
 {
-    public static RouteGroupBuilder MapUserEndpoints(this RouteGroupBuilder group)
+    public static void MapEndpoints(RouteGroupBuilder group)
     {
         var users = group.MapGroup("/users").WithTags("用户与角色");
 
@@ -46,7 +46,5 @@ public static class UserEndpoints
             .RequireAuthorization(AuthorizationSetup.Manager)
             .WithSummary("重置指定账号密码")
             .Produces<ApiResponse<object?>>();
-
-        return group;
     }
 }

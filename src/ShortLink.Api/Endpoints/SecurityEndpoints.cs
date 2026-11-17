@@ -6,9 +6,9 @@ using ShortLink.Contracts.Security;
 
 namespace ShortLink.Api.Endpoints;
 
-public static class SecurityEndpoints
+public sealed class SecurityEndpoints : IApiEndpointModule
 {
-    public static RouteGroupBuilder MapSecurityEndpoints(this RouteGroupBuilder group)
+    public static void MapEndpoints(RouteGroupBuilder group)
     {
         var security = group.MapGroup("/security").WithTags("安全");
 
@@ -41,7 +41,5 @@ public static class SecurityEndpoints
             .WithTags("安全")
             .WithSummary("提交滥用举报（匿名）")
             .Produces<ApiResponse<object?>>();
-
-        return group;
     }
 }

@@ -11,9 +11,9 @@ using ShortLink.Contracts.Links;
 
 namespace ShortLink.Api.Endpoints;
 
-public static class LinkEndpoints
+public sealed class LinkEndpoints : IApiEndpointModule
 {
-    public static RouteGroupBuilder MapLinkEndpoints(this RouteGroupBuilder group)
+    public static void MapEndpoints(RouteGroupBuilder group)
     {
         var links = group.MapGroup("/links").WithTags("短链");
 
@@ -172,7 +172,5 @@ public static class LinkEndpoints
             .RequireAuthorization(AuthorizationSetup.Writer)
             .WithSummary("获取（或首次生成）转化回调密钥")
             .Produces<ApiResponse<ConversionKeyDto>>();
-
-        return group;
     }
 }

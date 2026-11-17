@@ -9,9 +9,9 @@ namespace ShortLink.Api.Endpoints;
 /// API 凭据管理。属于后台能力，只接受 JWT 且要求所有者：
 /// 签发凭据等于把工作区数据交给外部系统，不能让管理员或成员自行扩大集成面。
 /// </summary>
-public static class ApiClientEndpoints
+public sealed class ApiClientEndpoints : IApiEndpointModule
 {
-    public static RouteGroupBuilder MapApiClientEndpoints(this RouteGroupBuilder group)
+    public static void MapEndpoints(RouteGroupBuilder group)
     {
         var clients = group.MapGroup("/api-clients").WithTags("API 凭据");
 
@@ -60,7 +60,5 @@ public static class ApiClientEndpoints
             .RequireAuthorization(AuthorizationSetup.Owner)
             .WithSummary("吊销 API 凭据")
             .Produces<ApiResponse<object?>>();
-
-        return group;
     }
 }
