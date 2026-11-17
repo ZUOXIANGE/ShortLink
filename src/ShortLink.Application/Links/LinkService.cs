@@ -444,14 +444,7 @@ public sealed class LinkService(
                      ?? throw new BusinessException(BizCodes.Conflict, "转化密钥生成失败，请重试");
         }
 
-        return new ConversionKeyDto(
-            link.Id,
-            link.Code,
-            secret,
-            "HMAC-SHA256",
-            "X-Signature",
-            "sha256={hex}",
-            "{X-Timestamp}.{rawJsonBody}");
+        return link.ToConversionKeyDto(secret);
     }
 
     private async Task<Link> LoadVisibleAsync(long id, CancellationToken cancellationToken)

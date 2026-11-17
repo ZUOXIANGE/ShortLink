@@ -1,6 +1,6 @@
 using Microsoft.Extensions.Logging;
 using ShortLink.Application.Abstractions;
-using ShortLink.Application.Messaging;
+using ShortLink.Application.Mapping;
 using ShortLink.Domain.Analytics;
 using ShortLink.Infrastructure.Diagnostics;
 using Wolverine;
@@ -31,7 +31,7 @@ public sealed class WolverineClickRecorder(IMessageBus bus, ILogger<WolverineCli
 
         try
         {
-            await bus.PublishAsync(ClickRecorded.From(clickEvent) with { QuotaReservationId = quotaReservationId })
+            await bus.PublishAsync(clickEvent.ToClickRecorded(quotaReservationId))
                 .ConfigureAwait(false);
             return true;
         }

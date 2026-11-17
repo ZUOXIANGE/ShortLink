@@ -5,6 +5,7 @@ using ShortLink.Application.Links;
 using ShortLink.Contracts;
 using ShortLink.Contracts.Analytics;
 using ShortLink.Domain.Users;
+using ShortLink.Mcp.Mapping;
 using ShortLink.Mcp.Models;
 
 namespace ShortLink.Mcp.Tools;
@@ -45,23 +46,13 @@ public sealed class AnalyticsTools(AnalyticsService analytics, LinkService links
 
                 var stats = await analytics.GetLinkStatsAsync(id, window, ct).ConfigureAwait(false);
 
-                return new LinkStats(
-                    stats.LinkId,
-                    stats.Code,
-                    stats.ShortUrl,
-                    stats.TargetUrl,
-                    stats.Days,
-                    stats.TotalClicks,
-                    stats.UniqueVisitors,
-                    stats.TodayClicks,
-                    stats.Conversions,
-                    stats.ConversionValue,
-                    includeTrend ? stats.Trend.Select(DailyPoint.From).ToList() : null,
+                return McpMapper.ToStats(
+                    stats,
+                    includeTrend ? stats.Trend.Select(McpMapper.ToDailyPoint).ToList() : null,
                     TopOf(stats.Referers, take),
                     TopOf(stats.Devices, take),
                     TopOf(stats.Browsers, take),
-                    TopOf(stats.Countries, take),
-                    stats.Variants.Select(VariantSlice.From).ToList());
+                    TopOf(stats.Countries, take));
             },
             cancellationToken);
 
@@ -81,20 +72,10 @@ public sealed class AnalyticsTools(AnalyticsService analytics, LinkService links
                 var window = Math.Clamp(days, 1, 90);
                 var overview = await analytics.GetDashboardAsync(window, ct).ConfigureAwait(false);
 
-                return new DashboardSummary(
+                return McpMapper.ToDashboard(
+                    overview,
                     window,
-                    overview.TotalLinks,
-                    overview.EnabledLinks,
-                    overview.ExpiredLinks,
-                    overview.TotalDomains,
-                    overview.TotalClicks,
-                    overview.TodayClicks,
-                    overview.YesterdayClicks,
-                    overview.UniqueVisitorsToday,
-                    overview.TotalConversions,
-                    overview.TopLinks
-                        .Select(link => new MetricSlice($"{link.Code} → {link.TargetUrl}", link.Clicks))
-                        .ToList());
+                    overview.TopLinks.Select(McpMapper.ToMetricSlice).ToList());
             },
             cancellationToken);
 
@@ -117,12 +98,12 @@ public sealed class AnalyticsTools(AnalyticsService analytics, LinkService links
                     .GetRecentClicksAsync(id, Math.Clamp(limit, 1, 100), ct)
                     .ConfigureAwait(false);
 
-                return (IReadOnlyList<ClickRecord>)clicks.Select(ClickRecord.From).ToList();
+                return (IReadOnlyList<ClickRecord>)clicks.Select(McpMapper.ToClickRecord).ToList();
             },
             cancellationToken);
 
     private static List<MetricSlice> TopOf(IReadOnlyList<DimensionItemDto> items, int take)
-        => items.Take(take).Select(MetricSlice.From).ToList();
+        => items.Take(take).Select(McpMapper.ToMetricSlice).ToList();
 
     private async Task<long> ResolveLinkIdAsync(long? linkId, string? shortUrl, CancellationToken cancellationToken)
     {

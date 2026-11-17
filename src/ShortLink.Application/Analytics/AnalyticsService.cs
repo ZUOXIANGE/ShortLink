@@ -1,5 +1,6 @@
 using ShortLink.Application.Abstractions;
 using ShortLink.Application.Abstractions.Persistence;
+using ShortLink.Application.Mapping;
 using ShortLink.Application.Workspaces;
 using ShortLink.Contracts;
 using ShortLink.Contracts.Analytics;
@@ -45,27 +46,7 @@ public sealed class AnalyticsService(
         var variants = await BuildVariantsAsync(linkId, variantClicks, conversionAggregate, cancellationToken)
             .ConfigureAwait(false);
 
-        return new LinkStatsDto(
-            link.Id,
-            link.Code,
-            domain?.Host ?? string.Empty,
-            domain?.BuildShortUrl(link.Code) ?? $"/{link.Code}",
-            link.TargetUrl,
-            aggregate.TotalClicks,
-            aggregate.UniqueVisitors,
-            aggregate.TodayClicks,
-            days,
-            conversionAggregate.Total,
-            conversionAggregate.Value,
-            aggregate.Trend,
-            aggregate.Referers,
-            aggregate.Devices,
-            aggregate.Browsers,
-            aggregate.OperatingSystems,
-            aggregate.Countries,
-            aggregate.Provinces,
-            aggregate.UnknownCountryClicks,
-            variants);
+        return DtoMapper.ToLinkStatsDto(link, domain, aggregate, conversionAggregate, variants, days);
     }
 
     public async Task<DashboardOverviewDto> GetDashboardAsync(int days, CancellationToken cancellationToken)
@@ -86,18 +67,7 @@ public sealed class AnalyticsService(
             .GetWorkspaceTotalsAsync(workspaceId, fromUtc: null, cancellationToken)
             .ConfigureAwait(false);
 
-        return new DashboardOverviewDto(
-            counters.Total,
-            counters.Enabled,
-            counters.Expired,
-            domainList.Count,
-            aggregate.TotalClicks,
-            aggregate.TodayClicks,
-            aggregate.YesterdayClicks,
-            aggregate.UniqueVisitorsToday,
-            conversionCount,
-            aggregate.Trend,
-            aggregate.TopLinks);
+        return DtoMapper.ToDashboardDto(counters, domainList.Count, aggregate, conversionCount);
     }
 
     public async Task<IReadOnlyList<ClickLogDto>> GetRecentClicksAsync(

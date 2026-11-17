@@ -4,6 +4,7 @@ using ShortLink.Application.Links;
 using ShortLink.Contracts;
 using ShortLink.Contracts.Links;
 using ShortLink.Domain.Users;
+using ShortLink.Mcp.Mapping;
 using ShortLink.Mcp.Models;
 
 namespace ShortLink.Mcp.Tools;
@@ -55,7 +56,7 @@ public sealed class LinkTools(LinkService links, McpToolRunner runner)
                 };
 
                 var created = await links.CreateAsync(request, ct).ConfigureAwait(false);
-                return LinkSummary.From(created);
+                return McpMapper.ToSummary(created);
             },
             cancellationToken);
 
@@ -73,7 +74,7 @@ public sealed class LinkTools(LinkService links, McpToolRunner runner)
             async ct =>
             {
                 var dto = await ResolveAsync(linkId, shortUrl, ct).ConfigureAwait(false);
-                return LinkSummary.From(dto);
+                return McpMapper.ToSummary(dto);
             },
             cancellationToken);
 
@@ -110,7 +111,7 @@ public sealed class LinkTools(LinkService links, McpToolRunner runner)
                     result.Total,
                     result.Page,
                     result.PageSize,
-                    result.Items.Select(LinkSummary.From).ToList());
+                    result.Items.Select(McpMapper.ToSummary).ToList());
             },
             cancellationToken);
 
@@ -130,7 +131,7 @@ public sealed class LinkTools(LinkService links, McpToolRunner runner)
                 // 用 SetEnabledAsync 而不是「先 Get 再 Toggle」：后者在两个相反请求并发时
                 // 会翻转两次回到原状态，而工具调用恰恰是最容易并发重试的场景。
                 var updated = await links.SetEnabledAsync(linkId, enabled, ct).ConfigureAwait(false);
-                return LinkSummary.From(updated);
+                return McpMapper.ToSummary(updated);
             },
             cancellationToken);
 

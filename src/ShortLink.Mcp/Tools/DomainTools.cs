@@ -2,6 +2,7 @@ using System.ComponentModel;
 using ModelContextProtocol.Server;
 using ShortLink.Application.Domains;
 using ShortLink.Domain.Users;
+using ShortLink.Mcp.Mapping;
 using ShortLink.Mcp.Models;
 
 namespace ShortLink.Mcp.Tools;
@@ -29,7 +30,7 @@ public sealed class DomainTools(DomainService domains, McpToolRunner runner)
                 var list = await domains.ListAsync(ct).ConfigureAwait(false);
 
                 return (IReadOnlyList<DomainOption>)list
-                    .Select(d => new DomainOption(d.Id, d.Host, d.Scheme, d.IsDefault, d.IsEnabled, d.LinkCount))
+                    .Select(McpMapper.ToDomainOption)
                     .ToList();
             },
             cancellationToken);

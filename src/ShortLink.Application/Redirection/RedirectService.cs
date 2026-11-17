@@ -2,6 +2,7 @@ using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using ShortLink.Application.Abstractions;
 using ShortLink.Application.Abstractions.Persistence;
+using ShortLink.Application.Mapping;
 using ShortLink.Application.Options;
 using ShortLink.Contracts;
 using ShortLink.Domain.Domains;
@@ -264,7 +265,7 @@ public sealed class RedirectService(
         // 未配置的 Host 一律落到默认域名：反代把 Host 改写成内部地址时依然可跳转。
         domain ??= await ResolveDefaultDomainAsync(cancellationToken).ConfigureAwait(false);
 
-        return new CachedDomain(domain.Id, domain.Host, domain.Scheme);
+        return domain.ToCachedDomain();
     }
 
     private async Task<ShortDomain> ResolveDefaultDomainAsync(CancellationToken cancellationToken)
@@ -288,26 +289,6 @@ public sealed class RedirectService(
 
         var routeList = await routes.ListByLinkAsync(link.Id, cancellationToken).ConfigureAwait(false);
 
-        return new CachedLink
-        {
-            Id = link.Id,
-            WorkspaceId = link.WorkspaceId,
-            DomainId = link.DomainId,
-            Code = link.Code,
-            TargetUrl = link.TargetUrl,
-            FallbackUrl = link.FallbackUrl,
-            RedirectType = (int)link.RedirectType,
-            Status = (int)link.Status,
-            StartsAtUtc = link.StartsAtUtc,
-            ExpiresAtUtc = link.ExpiresAtUtc,
-            ClickCount = link.ClickCount,
-            MaxClicks = link.MaxClicks,
-            PasswordHash = link.PasswordHash,
-            BotPolicy = (int)link.BotPolicy,
-            AllowList = IpAccessList.Parse(link.IpAllowList),
-            BlockList = IpAccessList.Parse(link.IpBlockList),
-            AntiBlockEnabled = link.AntiBlockEnabled,
-            Routes = routeList.Select(r => r.ToSnapshot()).ToList(),
-        };
+        return link.ToCachedLink(routeList.Select(r => r.ToSnapshot()).ToList());
     }
 }

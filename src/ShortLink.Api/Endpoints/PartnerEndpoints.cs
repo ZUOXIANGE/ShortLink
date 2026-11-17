@@ -136,17 +136,7 @@ public static class PartnerEndpoints
                         cancellationToken)
                     .ConfigureAwait(false);
 
-                return ApiResponse.Ok(new PartnerOverviewDto(
-                    overview.TotalLinks,
-                    overview.EnabledLinks,
-                    overview.ExpiredLinks,
-                    overview.TotalClicks,
-                    overview.TodayClicks,
-                    overview.YesterdayClicks,
-                    overview.UniqueVisitorsToday,
-                    overview.TotalConversions,
-                    overview.Trend,
-                    overview.TopLinks));
+                return ApiResponse.Ok(overview.ToPartnerDto());
             })
             .RequireAuthorization(ApiPolicies.AnalyticsRead)
             .WithSummary("工作区总览（第三方，仅聚合数据）")

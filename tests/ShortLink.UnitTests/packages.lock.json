@@ -1242,6 +1242,7 @@
           "FluentValidation.DependencyInjectionExtensions": "[12.2.0, )",
           "Microsoft.Extensions.Logging.Abstractions": "[11.0.0, )",
           "Microsoft.Extensions.Options.ConfigurationExtensions": "[11.0.0, )",
+          "Riok.Mapperly": "[4.3.1, )",
           "ShortLink.Contracts": "[0.1.0, )",
           "ShortLink.Domain": "[0.1.0, )"
         }
@@ -1282,6 +1283,7 @@
         "dependencies": {
           "Microsoft.Extensions.Logging.Abstractions": "[11.0.0, )",
           "ModelContextProtocol.AspNetCore": "[2.4.0, )",
+          "Riok.Mapperly": "[4.3.1, )",
           "ShortLink.Application": "[0.1.0, )",
           "ShortLink.Contracts": "[0.1.0, )"
         }
@@ -1508,6 +1510,12 @@
         "dependencies": {
           "System.Drawing.Common": "6.0.0"
         }
+      },
+      "Riok.Mapperly": {
+        "type": "CentralTransitive",
+        "requested": "[4.3.1, )",
+        "resolved": "4.3.1",
+        "contentHash": "oSE+OVLHyiojrws0QVbQaAT2YKsYbyHqJXPdV7EhGseR/dYgeWS2x1T5qY5I4E+RJkJqMSG+FyZOq4SljWgJWQ=="
       },
       "WolverineFx": {
         "type": "CentralTransitive",

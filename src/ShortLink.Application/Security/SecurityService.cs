@@ -2,6 +2,7 @@ using FluentValidation;
 using Microsoft.Extensions.Options;
 using ShortLink.Application.Abstractions;
 using ShortLink.Application.Abstractions.Persistence;
+using ShortLink.Application.Mapping;
 using ShortLink.Application.Options;
 using ShortLink.Application.Validation;
 using ShortLink.Application.Workspaces;
@@ -41,20 +42,7 @@ public sealed class SecurityService(
             .ConfigureAwait(false);
 
         var items = page.Items
-            .Select(e =>
-            {
-                var code = SecurityEventTypes.ToCode((int)e.Type);
-                return new SecurityEventDto(
-                    e.Id,
-                    code,
-                    SecurityEventTypes.ToName(code),
-                    e.Message,
-                    e.LinkId,
-                    e.Code,
-                    e.Ip,
-                    e.Country,
-                    e.CreatedAtUtc);
-            })
+            .Select(e => e.ToDto())
             .ToList();
 
         return new PagedResult<SecurityEventDto>(items, page.Total, page.Page, page.PageSize);

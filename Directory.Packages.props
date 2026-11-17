@@ -46,6 +46,11 @@
       仅作为 analyzer 使用，不参与运行时依赖。
     -->
     <PackageVersion Include="ServiceScan.SourceGenerator" Version="3.2.2" />
+    <!--
+      对象映射统一由源生成器在编译期展开：不反射、不手写逐字段赋值。
+      生成代码只依赖 BCL，新增映射时改 mapper 声明即可。
+    -->
+    <PackageVersion Include="Riok.Mapperly" Version="4.3.1" />
   </ItemGroup>
   <ItemGroup Label="可观测性">
     <PackageVersion Include="Serilog.AspNetCore" Version="10.0.0" />

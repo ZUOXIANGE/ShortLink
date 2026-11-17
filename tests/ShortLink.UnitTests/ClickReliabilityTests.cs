@@ -2,6 +2,7 @@ using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging.Abstractions;
 using ShortLink.Application.Abstractions;
+using ShortLink.Application.Mapping;
 using ShortLink.Application.Messaging;
 using ShortLink.Application.Redirection;
 using ShortLink.Contracts;
@@ -69,7 +70,7 @@ public sealed class ClickReliabilityTests
         }
 
         var click = TestData.CreateClick(linkId, routeId, TestData.Now, false, "visitor");
-        var message = ClickRecorded.From(click);
+        var message = click.ToClickRecorded();
         Assert.Equal(click.EventId, message.ClickId);
         Assert.Equal(click.EventId, message.ToEntity().EventId);
 

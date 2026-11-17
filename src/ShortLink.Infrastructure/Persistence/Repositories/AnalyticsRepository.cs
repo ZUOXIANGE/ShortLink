@@ -1,6 +1,7 @@
 using System.Linq.Expressions;
 using Microsoft.EntityFrameworkCore;
 using ShortLink.Application.Abstractions.Persistence;
+using ShortLink.Application.Mapping;
 using ShortLink.Contracts.Analytics;
 using ShortLink.Domain.Analytics;
 
@@ -146,19 +147,7 @@ public sealed class AnalyticsRepository(ShortLinkDbContext db) : IAnalyticsRepos
             .Where(c => c.LinkId == linkId)
             .OrderByDescending(c => c.Id)
             .Take(take)
-            .Select(c => new ClickLogDto(
-                c.Id,
-                c.Code,
-                c.ClickedAtUtc,
-                c.Ip,
-                c.Referer,
-                c.Device,
-                c.Browser,
-                c.OperatingSystem,
-                c.Country,
-                c.IsBot,
-                c.RouteId,
-                c.Province))
+            .ProjectToClickLogDto()
             .ToListAsync(cancellationToken)
             .ConfigureAwait(false);
 
@@ -191,19 +180,7 @@ public sealed class AnalyticsRepository(ShortLinkDbContext db) : IAnalyticsRepos
             .Where(c => c.LinkId == linkId && c.ClickDate >= fromDate)
             .OrderByDescending(c => c.Id)
             .Take(100_000)
-            .Select(c => new ClickLogDto(
-                c.Id,
-                c.Code,
-                c.ClickedAtUtc,
-                c.Ip,
-                c.Referer,
-                c.Device,
-                c.Browser,
-                c.OperatingSystem,
-                c.Country,
-                c.IsBot,
-                c.RouteId,
-                c.Province))
+            .ProjectToClickLogDto()
             .AsAsyncEnumerable();
 
     /// <summary>按天聚合点击数，并按 (日期, 访客指纹) 去重计算独立访客；缺失日期补 0，保证趋势轴连续。</summary>

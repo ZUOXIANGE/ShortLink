@@ -19,6 +19,8 @@
   <ItemGroup>
     <PackageReference Include="Microsoft.Extensions.Logging.Abstractions" />
     <PackageReference Include="ModelContextProtocol.AspNetCore" />
+    <!-- 工具返回模型是契约 DTO 的投影，同样走编译期映射。 -->
+    <PackageReference Include="Riok.Mapperly" />
   </ItemGroup>
 
   <ItemGroup>

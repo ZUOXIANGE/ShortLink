@@ -33,6 +33,7 @@ Api → Infrastructure → Application → Domain
 - **统计日界不走 UTC**：任何「按天分桶」或「今天」的概念（`click_date`、趋势区间、保留天数）一律取 `IStatisticsCalendar`，禁止 `DateTime.Today` / `DateOnly.FromDateTime(utcNow)` / `utcNow:yyyyMMdd`。写入侧把 `DateOnly` 当参数传进领域层（`ClickEvent.Create`），让 `click_date` 与查询用的是同一份日历；访客指纹的日期也必须同源，否则非 UTC 部署下独立访客会在 UTC 零点被劈成两段重复计数。
 - 表名与列名使用 snake_case，在 `Persistence/Configurations` 中显式配置。
 - 短码相关逻辑只在 `ShortCode`（Domain）里实现，端点与应用层不得自行拼装或校验字符集。
+- 对象映射统一用 Mapperly 在编译期生成（`Mapping/` 下的 `[Mapper]` 分部类），不要手写逐字段赋值或引入运行期反射映射。领域工厂（`Link.Create`、`ClickEvent.Create` 等）仍负责校验与截断，映射不得绕过。自定义转换方法若涉及常用类型（如 `string → string`），必须标 `[UserMapping(Default = false)]`，否则会被自动应用到所有同类型成员。
 - 跳转路径上禁止新增同步数据库调用；需要额外数据时通过 `ILinkCache` 快照扩展。
 - 后台任务不要在 `BackgroundService` 里解析 scoped 服务，必须 `CreateAsyncScope()`。
 - 爬虫与来源信息解析集中在 `UserAgentParser` / `VisitorFingerprint`，不要在端点内散落实现。

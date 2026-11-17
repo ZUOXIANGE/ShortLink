@@ -41,27 +41,6 @@ public sealed record ClickRecorded(
     bool IsBot,
     Guid? QuotaReservationId = null)
 {
-    /// <summary>从领域实体投影。字段与 <see cref="ClickEvent.Create"/> 的参数严格一一对应。</summary>
-    public static ClickRecorded From(ClickEvent click) => new(
-        click.EventId,
-        click.WorkspaceId,
-        click.LinkId,
-        click.DomainId,
-        click.RouteId,
-        click.Code,
-        click.ClickedAtUtc,
-        click.ClickDate,
-        click.VisitorHash,
-        click.Ip,
-        click.UserAgent,
-        click.Referer,
-        click.Country,
-        click.Province,
-        click.Device,
-        click.Browser,
-        click.OperatingSystem,
-        click.IsBot);
-
     /// <summary>还原为领域实体。校验与截断逻辑仍然只有 <see cref="ClickEvent.Create"/> 一份。</summary>
     public ClickEvent ToEntity() => ClickEvent.Create(
         WorkspaceId,

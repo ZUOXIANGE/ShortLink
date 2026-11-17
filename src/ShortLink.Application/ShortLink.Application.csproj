@@ -14,6 +14,8 @@
   <ItemGroup>
     <PackageReference Include="FluentValidation" />
     <PackageReference Include="FluentValidation.DependencyInjectionExtensions" />
+    <!-- 对象映射（领域 / 消息 → 契约 DTO）在编译期生成，禁止运行期反射映射。 -->
+    <PackageReference Include="Riok.Mapperly" />
     <!-- IOptions / ILogger：应用层需要读取安全与跳转配置、记录旁路失败日志 -->
     <PackageReference Include="Microsoft.Extensions.Options.ConfigurationExtensions" />
     <PackageReference Include="Microsoft.Extensions.Logging.Abstractions" />
