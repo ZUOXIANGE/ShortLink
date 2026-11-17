@@ -6,9 +6,8 @@ using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
 using Microsoft.IdentityModel.JsonWebTokens;
 using ShortLink.Application.Abstractions;
-using ShortLink.Application.Options;
+using ShortLink.Application.Links;
 using ShortLink.Application.Users;
-using ShortLink.Application.Validation;
 using ShortLink.Application.Workspaces;
 using ShortLink.Contracts;
 using ShortLink.Contracts.Links;
@@ -347,8 +346,8 @@ public sealed class UserWorkspaceIsolationTests
 internal sealed class SecurityTestCurrentUser(long userId, long workspaceId) : ICurrentUser
 {
     public long? UserId => userId;
-    public string? UserName => "owner";
-    public string? Role => "owner";
+    public string UserName => "owner";
+    public string Role => "owner";
     public long? WorkspaceId => workspaceId;
     public bool IsAuthenticated => true;
     public UserRole RoleValue => UserRole.Owner;

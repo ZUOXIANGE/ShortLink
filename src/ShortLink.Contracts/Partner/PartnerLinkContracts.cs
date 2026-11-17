@@ -1,6 +1,6 @@
-namespace ShortLink.Contracts.Partner;
-
 using ShortLink.Contracts.Analytics;
+
+namespace ShortLink.Contracts.Partner;
 
 /// <summary>
 /// 第三方视角的短链投影。刻意不包含工作区、密钥状态、IP 名单等后台字段：

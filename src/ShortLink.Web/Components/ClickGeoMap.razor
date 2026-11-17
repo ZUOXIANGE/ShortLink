@@ -1,6 +1,6 @@
 @* 归属地分布：世界国家 / 中国省份。地图数据是预生成的 SVG path，不引入图表库。 *@
 @inject MapAssets Maps
-@inject IJSRuntime JS
+@inject IJSRuntime Js
 
 <MudPaper Elevation="0" Class="geo-card pa-4">
     <div class="d-flex align-center justify-space-between flex-wrap gap-2 mb-2">
@@ -42,7 +42,7 @@
                           fill="@Fill(clicks)"
                           fill-rule="evenodd"
                           class="geo-region">
-                        <title>@LabelFor(location) · @clicks 次（@Percent(clicks).ToString("0.##")%）</title>
+                        <title>@LabelFor(location) · @clicks 次（@Percent(clicks).ToString("0.##", CultureInfo.InvariantCulture)%）</title>
                     </path>
                 }
             </svg>
@@ -133,9 +133,9 @@
         }
     }
 
-    private async Task OnViewChanged(string view)
+    private async Task OnViewChanged(string? view)
     {
-        if (string.Equals(_view, view, StringComparison.Ordinal))
+        if (view is null || string.Equals(_view, view, StringComparison.Ordinal))
         {
             return;
         }
@@ -183,7 +183,7 @@
         try
         {
             var codes = _map.Locations.Select(location => location.Id).ToArray();
-            var names = await JS.InvokeAsync<Dictionary<string, string>>("shortlink.regionDisplayNames", codes);
+            var names = await Js.InvokeAsync<Dictionary<string, string>>("shortlink.regionDisplayNames", codes.Cast<object?>().ToArray());
             _countryNames = new Dictionary<string, string>(names, StringComparer.OrdinalIgnoreCase);
         }
         catch (JSException)
@@ -232,7 +232,7 @@
 
             _matchedProvinceClicks = totals.Values.Sum();
             _topProvinces = _map.Locations
-                .Select(location => (Name: location.Name, Clicks: _provinceClicks.GetValueOrDefault(location.Id)))
+                .Select(location => (location.Name, Clicks: _provinceClicks.GetValueOrDefault(location.Id)))
                 .Where(item => item.Clicks > 0)
                 .OrderByDescending(item => item.Clicks)
                 .Take(5)

@@ -5,7 +5,6 @@ using ShortLink.Application.Abstractions;
 using ShortLink.Application.Abstractions.Persistence;
 using ShortLink.Application.Options;
 using ShortLink.Contracts;
-using ShortLink.Domain.ApiClients;
 using ShortLink.Domain.Users;
 
 namespace ShortLink.Infrastructure.Security;

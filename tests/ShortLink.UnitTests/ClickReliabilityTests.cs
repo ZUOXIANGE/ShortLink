@@ -3,7 +3,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging.Abstractions;
 using ShortLink.Application.Abstractions;
 using ShortLink.Application.Mapping;
-using ShortLink.Application.Messaging;
+using ShortLink.Application.Options;
 using ShortLink.Application.Redirection;
 using ShortLink.Contracts;
 using ShortLink.Domain.Analytics;
@@ -45,7 +45,7 @@ public sealed class ClickReliabilityTests
         var reservation = await quota.TryReserveAsync(link, TestContext.Current.CancellationToken);
         Assert.NotNull(reservation);
 
-        await quota.CompleteAsync(reservation!.ReservationId, link.Id, TestContext.Current.CancellationToken);
+        await quota.CompleteAsync(reservation.ReservationId, link.Id, TestContext.Current.CancellationToken);
         await quota.ReleaseAsync(reservation.ReservationId, link.Id, TestContext.Current.CancellationToken);
 
         Assert.Null(await quota.TryReserveAsync(link, TestContext.Current.CancellationToken));
@@ -128,8 +128,8 @@ public sealed class ClickReliabilityTests
             new FakeSecurityRepository(),
             new FakeUnitOfWork(),
             new FakeClock(TestData.Now),
-            Microsoft.Extensions.Options.Options.Create(new ShortLink.Application.Options.RedirectOptions()),
-            Microsoft.Extensions.Options.Options.Create(new ShortLink.Application.Options.SecurityOptions()),
+            Microsoft.Extensions.Options.Options.Create(new RedirectOptions()),
+            Microsoft.Extensions.Options.Options.Create(new SecurityOptions()),
             quota,
             NullLogger<RedirectService>.Instance);
         var context = new RedirectRequestContext(

@@ -1,6 +1,5 @@
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
-using ModelContextProtocol.Server;
 using ShortLink.Mcp.Options;
 using ShortLink.Mcp.Tools;
 

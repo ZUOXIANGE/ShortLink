@@ -30,7 +30,6 @@ public sealed class ApiClientService(
     IValidator<UpdateApiClientRequest> updateValidator)
 {
     private const int MaxKeyAttempts = 5;
-    private const int SecretBytes = 32;
 
     public async Task<IReadOnlyList<ApiClientDto>> ListAsync(CancellationToken cancellationToken)
     {
@@ -150,7 +149,7 @@ public sealed class ApiClientService(
             throw new BusinessException(BizCodes.Conflict, "凭据已吊销，无法轮换");
         }
 
-        var secret = secrets.Create(SecretBytes);
+        var secret = secrets.Create();
         client.RotateSecret(protector.Protect(secret), secret[^4..]);
         await unitOfWork.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
 
@@ -191,7 +190,7 @@ public sealed class ApiClientService(
             var keyId = "ak_" + secrets.Create(12);
             if (await clients.FindByKeyIdAsync(keyId, cancellationToken).ConfigureAwait(false) is null)
             {
-                return (keyId, secrets.Create(SecretBytes));
+                return (keyId, secrets.Create());
             }
         }
 

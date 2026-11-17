@@ -78,7 +78,7 @@ else
                 <div class="meta">@ExpiryText(context)</div>
             </MudTd>
             <MudTd DataLabel="最近使用">
-                @(context.LastUsedAtUtc?.ToLocalTime().ToString("yyyy-MM-dd HH:mm") ?? "从未使用")
+                @(context.LastUsedAtUtc?.ToLocalTime().ToString("yyyy-MM-dd HH:mm", CultureInfo.InvariantCulture) ?? "从未使用")
             </MudTd>
             <MudTd DataLabel="操作">
                 <MudMenu Icon="@Icons.Material.Filled.MoreVert" Size="Size.Small" Dense="true">

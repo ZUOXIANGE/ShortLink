@@ -3,7 +3,7 @@
 @inject ApiClient Api
 @inject IDialogService DialogService
 @inject ISnackbar Snackbar
-@inject IJSRuntime JS
+@inject IJSRuntime Js
 @inject NavigationManager Navigation
 @inject Permissions Perms
 @inject FileSaver Saver
@@ -38,15 +38,15 @@
                       Style="min-width:300px;" />
 
         <MudSelect T="long?" Value="_domainId" Label="域名" Variant="Variant.Outlined" Margin="Margin.Dense" Style="width:190px;" ValueChanged="OnDomainChanged">
-            <MudSelectItem T="long?" Value="@((long?)null)">全部域名</MudSelectItem>
+            <MudSelectItem T="long?" Value="@(null)">全部域名</MudSelectItem>
             @foreach (var domain in _domains)
             {
-                <MudSelectItem T="long?" Value="@((long?)domain.Id)">@domain.Host</MudSelectItem>
+                <MudSelectItem T="long?" Value="@(domain.Id)">@domain.Host</MudSelectItem>
             }
         </MudSelect>
 
         <MudSelect T="string" Value="_status" Label="状态" Variant="Variant.Outlined" Margin="Margin.Dense" Style="width:150px;" ValueChanged="OnStatusChanged">
-            <MudSelectItem T="string" Value="@((string?)null)">全部</MudSelectItem>
+            <MudSelectItem T="string" Value="@(null)">全部</MudSelectItem>
             <MudSelectItem T="string" Value="@("enabled")">启用中</MudSelectItem>
             <MudSelectItem T="string" Value="@("disabled")">已停用</MudSelectItem>
             <MudSelectItem T="string" Value="@("expired")">已过期</MudSelectItem>
@@ -96,7 +96,7 @@
           Style="border:1px solid #F0E4E6;border-radius:14px;overflow:hidden;">
     <HeaderContent>
         <MudTh Style="width:44px;">
-            <MudCheckBox T="bool" Value="@AllOnPageSelected" ValueChanged="@((bool v) => OnHeaderCheckBox(v))"
+            <MudCheckBox T="bool" Value="@AllOnPageSelected" ValueChanged="@(v => OnHeaderCheckBox(v))"
                          Dense="true" Color="Color.Primary" Disabled="@(_pageItems.Count == 0)" />
         </MudTh>
         <MudTh><MudTableSortLabel T="LinkDto" SortLabel="created">短链接</MudTableSortLabel></MudTh>
@@ -107,7 +107,7 @@
     </HeaderContent>
     <RowTemplate>
         <MudTd>
-            <MudCheckBox T="bool" Value="@IsSelected(context.Id)" ValueChanged="@((bool v) => ToggleSelect(context.Id, v))"
+            <MudCheckBox T="bool" Value="@IsSelected(context.Id)" ValueChanged="@(v => ToggleSelect(context.Id, v))"
                          Dense="true" Color="Color.Primary" />
         </MudTd>
         <MudTd DataLabel="短链接">
@@ -119,7 +119,7 @@
                 <div>
                     <div class="mono short-url">@context.ShortUrl</div>
                     <div class="meta">
-                        @(context.Title ?? "未命名") · @context.CreatedAtUtc.ToLocalTime().ToString("yyyy-MM-dd")
+                        @(context.Title ?? "未命名") · @context.CreatedAtUtc.ToLocalTime().ToString("yyyy-MM-dd", CultureInfo.InvariantCulture)
                         @if (!string.IsNullOrWhiteSpace(context.CreatedByName))
                         {
                             <span> · @context.CreatedByName</span>
@@ -195,11 +195,11 @@
             }
             @if (context.StartsAtUtc is { } startsAt)
             {
-                <div class="meta">起 @startsAt.ToLocalTime().ToString("MM-dd HH:mm")</div>
+                <div class="meta">起 @startsAt.ToLocalTime().ToString("MM-dd HH:mm", CultureInfo.InvariantCulture)</div>
             }
             @if (context.ExpiresAtUtc is { } expiresAt)
             {
-                <div class="meta">至 @expiresAt.ToLocalTime().ToString("MM-dd HH:mm")</div>
+                <div class="meta">至 @expiresAt.ToLocalTime().ToString("MM-dd HH:mm", CultureInfo.InvariantCulture)</div>
             }
         </MudTd>
         <MudTd DataLabel="操作">
@@ -579,7 +579,7 @@
     {
         try
         {
-            await JS.InvokeVoidAsync("navigator.clipboard.writeText", url);
+            await Js.InvokeVoidAsync("navigator.clipboard.writeText", url);
             Snackbar.Add("已复制到剪贴板", Severity.Success);
         }
         catch (JSException)

@@ -9,6 +9,7 @@ using ShortLink.Application.Options;
 using ShortLink.Contracts;
 using ShortLink.Contracts.Auth;
 using ShortLink.Contracts.Domains;
+using ShortLink.Contracts.Links;
 using ShortLink.Contracts.Users;
 using ShortLink.Domain.Analytics;
 using ShortLink.Infrastructure.Analytics;
@@ -202,14 +203,14 @@ public sealed class HardeningTests(ApiFactory factory)
 
     private static async Task<long> CreateLinkAsync(HttpClient client, string code)
     {
-        var response = await client.PostAsJsonAsync("/api/v1/links", new ShortLink.Contracts.Links.CreateLinkRequest
+        var response = await client.PostAsJsonAsync("/api/v1/links", new CreateLinkRequest
         {
             Code = code,
             TargetUrl = "https://example.com/retention",
             Title = "保留策略用例",
         });
 
-        var envelope = await response.Content.ReadFromJsonAsync<ApiResponse<ShortLink.Contracts.Links.LinkDto>>(ApiFactory.JsonOptions);
+        var envelope = await response.Content.ReadFromJsonAsync<ApiResponse<LinkDto>>(ApiFactory.JsonOptions);
         Assert.True(envelope!.Code == BizCodes.Success, $"创建短链失败：{envelope.Msg}");
         return envelope.Data!.Id;
     }

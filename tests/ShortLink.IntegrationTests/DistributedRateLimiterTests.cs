@@ -60,7 +60,7 @@ public sealed class DistributedRateLimiterTests(RedisHostFixture fixture)
         // null 表示「没有过期时间」——那正是 INCR 与 EXPIRE 拆成两步时最容易留下的永久键，
         // 一旦发生，这个 IP 会被窗口额度永久封死，且没有任何告警。
         Assert.NotNull(ttl);
-        Assert.InRange(ttl!.Value, TimeSpan.FromSeconds(1), Window);
+        Assert.InRange(ttl.Value, TimeSpan.FromSeconds(1), Window);
     }
 
     [Fact]
@@ -73,7 +73,7 @@ public sealed class DistributedRateLimiterTests(RedisHostFixture fixture)
 
         // 20 个并发抢 5 个额度。若 INCR 与判定不是原子的，就会出现放行数 > 5。
         var leases = await Task.WhenAll(
-            Enumerable.Range(0, 20).Select(_ => limiter.AcquireAsync(1).AsTask()));
+            Enumerable.Range(0, 20).Select(_ => limiter.AcquireAsync().AsTask()));
 
         try
         {

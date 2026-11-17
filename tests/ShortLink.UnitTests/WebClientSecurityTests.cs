@@ -38,13 +38,11 @@ public sealed class ApiClientDownloadTests
     [Fact]
     public async Task Http200_Json_Unauthorized_Should_Fail_And_Redirect_To_Login()
     {
-        using var response = new HttpResponseMessage(HttpStatusCode.OK)
-        {
-            Content = new StringContent(
-                """{"code":40101,"msg":"登录状态已失效","data":null}""",
-                Encoding.UTF8,
-                "application/json"),
-        };
+        using var response = new HttpResponseMessage(HttpStatusCode.OK);
+        response.Content = new StringContent(
+            """{"code":40101,"msg":"登录状态已失效","data":null}""",
+            Encoding.UTF8,
+            "application/json");
         var navigation = new FakeNavigationManager();
         var client = CreateClient(response, navigation);
 
@@ -68,7 +66,8 @@ public sealed class ApiClientDownloadTests
             FileNameStar = "links.csv",
         };
         content.Headers.ContentDisposition.Parameters.Add(new NameValueHeaderValue("truncated", "true"));
-        using var response = new HttpResponseMessage(HttpStatusCode.OK) { Content = content };
+        using var response = new HttpResponseMessage(HttpStatusCode.OK);
+        response.Content = content;
         var client = CreateClient(response, new FakeNavigationManager());
 
         var result = await client.ExportLinksAsync(new LinkQuery(), TestContext.Current.CancellationToken);

@@ -14,7 +14,7 @@
     <MudStack Row="true" Spacing="3" AlignItems="AlignItems.Center" Class="flex-wrap">
         <MudSelect T="string" Value="_type" Label="事件类型" Variant="Variant.Outlined" Margin="Margin.Dense"
                    Style="width:200px;" ValueChanged="OnTypeChanged">
-            <MudSelectItem T="string" Value="@((string?)null)">全部类型</MudSelectItem>
+            <MudSelectItem T="string" Value="@(null)">全部类型</MudSelectItem>
             <MudSelectItem T="string" Value="@SecurityEventTypes.IpBlocked">IP 黑名单拦截</MudSelectItem>
             <MudSelectItem T="string" Value="@SecurityEventTypes.IpNotAllowed">IP 不在白名单</MudSelectItem>
             <MudSelectItem T="string" Value="@SecurityEventTypes.BotBlocked">机器人拦截</MudSelectItem>
@@ -28,10 +28,10 @@
 
         <MudSelect T="int?" Value="_days" Label="时间范围" Variant="Variant.Outlined" Margin="Margin.Dense"
                    Style="width:150px;" ValueChanged="OnDaysChanged">
-            <MudSelectItem T="int?" Value="@((int?)null)">全部</MudSelectItem>
-            <MudSelectItem T="int?" Value="@((int?)1)">近 1 天</MudSelectItem>
-            <MudSelectItem T="int?" Value="@((int?)7)">近 7 天</MudSelectItem>
-            <MudSelectItem T="int?" Value="@((int?)30)">近 30 天</MudSelectItem>
+            <MudSelectItem T="int?" Value="@(null)">全部</MudSelectItem>
+            <MudSelectItem T="int?" Value="@(1)">近 1 天</MudSelectItem>
+            <MudSelectItem T="int?" Value="@(7)">近 7 天</MudSelectItem>
+            <MudSelectItem T="int?" Value="@(30)">近 30 天</MudSelectItem>
         </MudSelect>
 
         <MudButton Variant="Variant.Outlined" Color="Color.Primary" StartIcon="@Icons.Material.Filled.Refresh"
@@ -60,7 +60,7 @@ else
             <MudTh>国家</MudTh>
         </HeaderContent>
         <RowTemplate>
-            <MudTd DataLabel="时间">@context.CreatedAtUtc.ToLocalTime().ToString("yyyy-MM-dd HH:mm:ss")</MudTd>
+            <MudTd DataLabel="时间">@context.CreatedAtUtc.ToLocalTime().ToString("yyyy-MM-dd HH:mm:ss", CultureInfo.InvariantCulture)</MudTd>
             <MudTd DataLabel="类型">
                 <MudChip T="string" Size="Size.Small" Color="@TypeColor(context.Type)">@context.TypeName</MudChip>
             </MudTd>

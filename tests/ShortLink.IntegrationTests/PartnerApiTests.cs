@@ -242,8 +242,7 @@ public sealed class PartnerApiTests(ApiFactory factory)
         var credential = new Credential(
             0,
             "ak_" + Guid.NewGuid().ToString("N"),
-            Guid.NewGuid().ToString("N"),
-            string.Empty);
+            Guid.NewGuid().ToString("N"));
 
         var envelope = await ReadAsync<object>(
             await SendSignedAsync(credential, HttpMethod.Get, "/api/v1/partner/links"));
@@ -326,8 +325,7 @@ public sealed class PartnerApiTests(ApiFactory factory)
         return new Credential(
             envelope.Data!.Client.Id,
             envelope.Data.Client.KeyId,
-            envelope.Data.Secret,
-            envelope.Data.Client.Name);
+            envelope.Data.Secret);
     }
 
     private static async Task<long> CreateLinkAsAdminAsync(HttpClient admin, string targetUrl)
@@ -386,8 +384,8 @@ public sealed class PartnerApiTests(ApiFactory factory)
     {
         var envelope = await response.Content.ReadFromJsonAsync<ApiResponse<T>>(JsonOptions, Ct);
         Assert.NotNull(envelope);
-        return envelope!;
+        return envelope;
     }
 
-    private sealed record Credential(long Id, string KeyId, string Secret, string Name);
+    private sealed record Credential(long Id, string KeyId, string Secret);
 }

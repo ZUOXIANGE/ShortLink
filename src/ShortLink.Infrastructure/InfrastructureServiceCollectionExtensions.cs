@@ -71,8 +71,8 @@ public static class InfrastructureServiceCollectionExtensions
         // 便于测试宿主与容器环境用配置覆盖，而不用改代码。
         services.AddDbContext<ShortLinkDbContext>((serviceProvider, options) =>
         {
-            var database = serviceProvider.GetRequiredService<IOptions<DatabaseOptions>>().Value;
-            ConfigureDatabase(options, database);
+            var dbOptions = serviceProvider.GetRequiredService<IOptions<DatabaseOptions>>().Value;
+            ConfigureDatabase(options, dbOptions);
         });
         services.AddScoped<IUnitOfWork>(sp => sp.GetRequiredService<ShortLinkDbContext>());
 
@@ -183,7 +183,7 @@ public static class InfrastructureServiceCollectionExtensions
     {
         var connectionString = database.ConnectionString;
 
-        switch (database.Provider?.Trim().ToLowerInvariant())
+        switch (database.Provider.Trim().ToLowerInvariant())
         {
             case "sqlite":
                 options.UseSqlite(

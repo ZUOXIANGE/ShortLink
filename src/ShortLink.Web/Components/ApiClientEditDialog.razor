@@ -1,6 +1,5 @@
 @inject ApiClient Api
 @inject ISnackbar Snackbar
-@inject Permissions Perms
 
 <MudDialog>
     <TitleContent>
@@ -47,7 +46,7 @@
                 @foreach (var scope in ApiScopes.All)
                 {
                     <MudCheckBox T="bool" Value="@_scopes.Contains(scope)"
-                                 ValueChanged="@((bool value) => ToggleScope(scope, value))"
+                                 ValueChanged="@(value => ToggleScope(scope, value))"
                                  Label="@ApiScopeDisplay.Label(scope)" Color="Color.Primary" />
                 }
             </MudStack>

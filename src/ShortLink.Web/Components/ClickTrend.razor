@@ -21,12 +21,12 @@
             {
                 var height = Percent(item.Clicks);
                 var visitorHeight = Percent(item.UniqueVisitors);
-                <div class="chart-col" title="@($"{item.Date:yyyy-MM-dd} 点击 {item.Clicks} / 访客 {item.UniqueVisitors}")">
+                <div class="chart-col" title="@($"{item.Date.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture)} 点击 {item.Clicks} / 访客 {item.UniqueVisitors}")">
                     <div class="chart-bars">
-                        <div class="bar bar-clicks" style="height:@($"{height:0.#}")%"></div>
-                        <div class="bar bar-visitors" style="height:@($"{visitorHeight:0.#}")%"></div>
+                        <div class="bar bar-clicks" style="height:@(height.ToString("0.#", CultureInfo.InvariantCulture))%"></div>
+                        <div class="bar bar-visitors" style="height:@(visitorHeight.ToString("0.#", CultureInfo.InvariantCulture))%"></div>
                     </div>
-                    <span class="chart-label">@item.Date.ToString("MM-dd")</span>
+                    <span class="chart-label">@item.Date.ToString("MM-dd", CultureInfo.InvariantCulture)</span>
                 </div>
             }
         </div>

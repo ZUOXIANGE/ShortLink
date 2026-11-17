@@ -56,7 +56,7 @@ public static class AccessPolicy
     }
 
     /// <summary>微信 / QQ 内置浏览器判定，用于防红中间页。</summary>
-    public static bool IsWeChatOrQQ(string? userAgent)
+    public static bool IsWeChatOrQq(string? userAgent)
     {
         if (string.IsNullOrEmpty(userAgent))
         {

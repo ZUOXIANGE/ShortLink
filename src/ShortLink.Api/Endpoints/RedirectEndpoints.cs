@@ -1,4 +1,3 @@
-using System.Net;
 using ShortLink.Application.Abstractions;
 using ShortLink.Application.Redirection;
 using ShortLink.Contracts;
@@ -85,7 +84,7 @@ public static class RedirectEndpoints
 
             if (outcome.CountClick)
             {
-                var published = await RecordClickAsync(context, outcome, requestContext, recorder, now, clickDate)
+                var published = await RecordClickAsync(outcome, requestContext, recorder, now, clickDate)
                     .ConfigureAwait(false);
                 if (!published)
                 {
@@ -216,7 +215,6 @@ public static class RedirectEndpoints
         => Results.Content(html, "text/html; charset=utf-8", statusCode: statusCode);
 
     private static ValueTask<bool> RecordClickAsync(
-        HttpContext context,
         RedirectOutcome outcome,
         RedirectRequestContext requestContext,
         IClickRecorder recorder,

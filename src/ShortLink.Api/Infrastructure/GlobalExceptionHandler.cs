@@ -1,5 +1,4 @@
 using System.Diagnostics;
-using System.Security.Claims;
 using Microsoft.AspNetCore.Diagnostics;
 using Microsoft.EntityFrameworkCore;
 using ShortLink.Contracts;

@@ -7,7 +7,6 @@ using ShortLink.Application.Domains;
 using ShortLink.Application.Links;
 using ShortLink.Application.Options;
 using ShortLink.Application.Security;
-using ShortLink.Application.Validation;
 using ShortLink.Application.Workspaces;
 using ShortLink.Contracts;
 using ShortLink.Contracts.Domains;
@@ -656,8 +655,8 @@ public sealed class DomainRouteSecurityRegressionTests
 internal sealed class RegressionCurrentUser : ICurrentUser
 {
     public long? UserId { get; set; } = 1;
-    public string? UserName => "tester";
-    public string? Role => RoleValue.ToClaimValue();
+    public string UserName => "tester";
+    public string Role => RoleValue.ToClaimValue();
     public long? WorkspaceId { get; set; }
     public bool IsAuthenticated => true;
     public UserRole RoleValue { get; set; } = UserRole.Owner;

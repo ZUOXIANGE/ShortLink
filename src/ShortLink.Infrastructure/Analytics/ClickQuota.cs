@@ -11,20 +11,18 @@ public sealed class InMemoryClickQuota : IClickQuota
 {
     private readonly ConcurrentDictionary<long, QuotaState> _states = new();
     private readonly ConcurrentDictionary<Guid, long> _activeReservations = new();
-    private readonly ILogger<InMemoryClickQuota> _logger;
     private readonly bool _multiInstanceEnvironment;
 
     public InMemoryClickQuota(ILogger<InMemoryClickQuota> logger)
     {
-        _logger = logger;
         _multiInstanceEnvironment = IsMultiInstanceEnvironment();
         if (_multiInstanceEnvironment)
         {
-            _logger.LogError("当前部署可能是多实例，但未配置 Redis；带 MaxClicks 的短链将安全失败，不会使用本地配额超发");
+            logger.LogError("当前部署可能是多实例，但未配置 Redis；带 MaxClicks 的短链将安全失败，不会使用本地配额超发");
         }
         else
         {
-            _logger.LogInformation("点击封顶使用进程内配额，仅适用于单实例；多实例必须配置 Cache:RedisConnectionString");
+            logger.LogInformation("点击封顶使用进程内配额，仅适用于单实例；多实例必须配置 Cache:RedisConnectionString");
         }
     }
 

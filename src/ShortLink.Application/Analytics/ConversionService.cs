@@ -2,7 +2,6 @@ using System.Globalization;
 using Microsoft.Extensions.Logging;
 using ShortLink.Application.Abstractions;
 using ShortLink.Application.Abstractions.Persistence;
-using ShortLink.Application.Workspaces;
 using ShortLink.Contracts;
 using ShortLink.Contracts.Analytics;
 using ShortLink.Domain.Analytics;

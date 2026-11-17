@@ -1,11 +1,16 @@
 using System.Runtime.CompilerServices;
 using ShortLink.Application.Abstractions;
 using ShortLink.Application.Abstractions.Persistence;
+using ShortLink.Application.Options;
 using ShortLink.Application.Redirection;
 using ShortLink.Contracts;
 using ShortLink.Contracts.Links;
+using ShortLink.Contracts.Security;
 using ShortLink.Domain.Domains;
 using ShortLink.Domain.Links;
+using ShortLink.Domain.Security;
+using ShortLink.Infrastructure.Analytics;
+using ShortLink.Infrastructure.Security;
 using Xunit;
 
 namespace ShortLink.UnitTests;
@@ -228,23 +233,23 @@ internal sealed class FakeRouteRepository(params LinkRoute[] routes) : IRouteRep
 
     public void Add(LinkRoute route) { }
 
-    public void RemoveRange(IEnumerable<LinkRoute> routes) { }
+    public void RemoveRange(IEnumerable<LinkRoute> routeItems) { }
 }
 
 internal sealed class FakeSecurityRepository : ISecurityRepository
 {
-    public List<ShortLink.Domain.Security.SecurityEvent> Items { get; } = [];
+    public List<SecurityEvent> Items { get; } = [];
 
-    public Task<PagedResult<ShortLink.Domain.Security.SecurityEvent>> QueryAsync(
-        ShortLink.Contracts.Security.SecurityEventQuery query,
+    public Task<PagedResult<SecurityEvent>> QueryAsync(
+        SecurityEventQuery query,
         long workspaceId,
         DateTime fromUtc,
         CancellationToken cancellationToken)
-        => Task.FromResult(new PagedResult<ShortLink.Domain.Security.SecurityEvent>(
+        => Task.FromResult(new PagedResult<SecurityEvent>(
             Items, Items.Count, 1, 20));
 
     public Task<bool> TryAddReportWithinQuotaAsync(
-        ShortLink.Domain.Security.SecurityEvent securityEvent,
+        SecurityEvent securityEvent,
         int quota,
         DateTime fromUtc,
         CancellationToken cancellationToken)
@@ -252,7 +257,7 @@ internal sealed class FakeSecurityRepository : ISecurityRepository
         var recent = Items.Count(e =>
             e.LinkId == securityEvent.LinkId
             && e.Ip == securityEvent.Ip
-            && e.Type == ShortLink.Domain.Security.SecurityEventType.AbuseReported
+            && e.Type == SecurityEventType.AbuseReported
             && e.CreatedAtUtc >= fromUtc);
         if (recent >= quota)
         {
@@ -263,7 +268,7 @@ internal sealed class FakeSecurityRepository : ISecurityRepository
         return Task.FromResult(true);
     }
 
-    public void Add(ShortLink.Domain.Security.SecurityEvent securityEvent) => Items.Add(securityEvent);
+    public void Add(SecurityEvent securityEvent) => Items.Add(securityEvent);
 }
 
 internal sealed class FakeUnitOfWork : IUnitOfWork
@@ -334,10 +339,10 @@ public sealed class RedirectServiceTests
             new FakeSecurityRepository(),
             new FakeUnitOfWork(),
             clock ?? new FakeClock(Now),
-            Microsoft.Extensions.Options.Options.Create(new ShortLink.Application.Options.RedirectOptions()),
-            Microsoft.Extensions.Options.Options.Create(new ShortLink.Application.Options.SecurityOptions()),
-            new ShortLink.Infrastructure.Analytics.InMemoryClickQuota(
-                Microsoft.Extensions.Logging.Abstractions.NullLogger<ShortLink.Infrastructure.Analytics.InMemoryClickQuota>.Instance),
+            Microsoft.Extensions.Options.Options.Create(new RedirectOptions()),
+            Microsoft.Extensions.Options.Options.Create(new SecurityOptions()),
+            new InMemoryClickQuota(
+                Microsoft.Extensions.Logging.Abstractions.NullLogger<InMemoryClickQuota>.Instance),
             Microsoft.Extensions.Logging.Abstractions.NullLogger<RedirectService>.Instance);
 
     private static RedirectRequestContext Context(string? ip = null, string? userAgent = null)
@@ -433,7 +438,7 @@ public sealed class PasswordHasherTests
     [Fact]
     public void Hash_Then_Verify_Should_Succeed()
     {
-        var hasher = new ShortLink.Infrastructure.Security.Pbkdf2PasswordHasher();
+        var hasher = new Pbkdf2PasswordHasher();
         var hash = hasher.Hash("Admin@123456");
 
         Assert.True(hasher.Verify(hash, "Admin@123456"));
@@ -443,7 +448,7 @@ public sealed class PasswordHasherTests
     [Fact]
     public void Hash_Should_Produce_Different_Salt_Each_Time()
     {
-        var hasher = new ShortLink.Infrastructure.Security.Pbkdf2PasswordHasher();
+        var hasher = new Pbkdf2PasswordHasher();
 
         Assert.NotEqual(hasher.Hash("same-password"), hasher.Hash("same-password"));
     }
@@ -451,7 +456,7 @@ public sealed class PasswordHasherTests
     [Fact]
     public void Verify_Should_Reject_Malformed_Hash()
     {
-        var hasher = new ShortLink.Infrastructure.Security.Pbkdf2PasswordHasher();
+        var hasher = new Pbkdf2PasswordHasher();
 
         Assert.False(hasher.Verify("not-a-hash", "whatever"));
         Assert.False(hasher.Verify(string.Empty, "whatever"));
@@ -463,7 +468,7 @@ public sealed class UserAgentParserTests
     [Fact]
     public void Parse_Should_Detect_WeChat_Mobile()
     {
-        var info = ShortLink.Infrastructure.Analytics.UserAgentParser.Parse(
+        var info = UserAgentParser.Parse(
             "Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 MicroMessenger/8.0.40 Mobile/15E148");
 
         Assert.Equal("WeChat", info.Browser);
@@ -475,7 +480,7 @@ public sealed class UserAgentParserTests
     [Fact]
     public void Parse_Should_Detect_Desktop_Chrome()
     {
-        var info = ShortLink.Infrastructure.Analytics.UserAgentParser.Parse(
+        var info = UserAgentParser.Parse(
             "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/126.0.0.0 Safari/537.36");
 
         Assert.Equal("Chrome", info.Browser);
@@ -486,7 +491,7 @@ public sealed class UserAgentParserTests
     [Fact]
     public void Parse_Should_Flag_Bots()
     {
-        var info = ShortLink.Infrastructure.Analytics.UserAgentParser.Parse("Googlebot/2.1 (+http://www.google.com/bot.html)");
+        var info = UserAgentParser.Parse("Googlebot/2.1 (+http://www.google.com/bot.html)");
 
         Assert.True(info.IsBot);
     }
@@ -494,9 +499,9 @@ public sealed class UserAgentParserTests
     [Fact]
     public void VisitorFingerprint_Should_Be_Stable_Within_Same_Day_And_Differ_Across_Days()
     {
-        var day1 = ShortLink.Infrastructure.Analytics.VisitorFingerprint.Compute("1.2.3.4", "UA", Today());
-        var day1Again = ShortLink.Infrastructure.Analytics.VisitorFingerprint.Compute("1.2.3.4", "UA", Today());
-        var day2 = ShortLink.Infrastructure.Analytics.VisitorFingerprint.Compute("1.2.3.4", "UA", Today().AddDays(1));
+        var day1 = VisitorFingerprint.Compute("1.2.3.4", "UA", Today());
+        var day1Again = VisitorFingerprint.Compute("1.2.3.4", "UA", Today());
+        var day2 = VisitorFingerprint.Compute("1.2.3.4", "UA", Today().AddDays(1));
 
         Assert.Equal(day1, day1Again);
         Assert.NotEqual(day1, day2);

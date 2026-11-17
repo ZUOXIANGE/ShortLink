@@ -37,7 +37,7 @@ public static class RedirectPageRenderer
         => Layout($$"""
             <div class="card">
               <div class="badge">ShortLink</div>
-              <h1>{{Encode(string.IsNullOrWhiteSpace(title) ? "即将跳转到外部页面" : title!)}}</h1>
+              <h1>{{Encode(string.IsNullOrWhiteSpace(title) ? "即将跳转到外部页面" : title)}}</h1>
               <p class="hint">当前在微信 / QQ 内置浏览器中打开，如无法跳转，请点击右上角「···」选择「在浏览器打开」。</p>
               <p class="mono">{{Encode(Shorten(targetUrl))}}</p>
               <form method="get" action="/{{Encode(code)}}">

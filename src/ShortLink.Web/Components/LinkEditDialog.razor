@@ -24,7 +24,7 @@
                                Disabled="@IsEdit">
                         @foreach (var domain in Domains)
                         {
-                            <MudSelectItem T="long?" Value="@((long?)domain.Id)">
+                            <MudSelectItem T="long?" Value="@(domain.Id)">
                                 @($"{domain.Host}（{domain.Scheme}）{(domain.IsDefault ? " · 默认" : string.Empty)}")
                             </MudSelectItem>
                         }

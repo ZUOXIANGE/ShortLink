@@ -1,9 +1,12 @@
+using System.Net.Http.Headers;
 using System.Net.Http.Json;
 using System.Text.Json;
 using Microsoft.Extensions.Logging.Abstractions;
 using ModelContextProtocol.Client;
 using ModelContextProtocol.Protocol;
+using ShortLink.Contracts;
 using ShortLink.Contracts.Auth;
+using ShortLink.Contracts.Users;
 using ShortLink.Domain.Users;
 using Xunit;
 
@@ -78,7 +81,7 @@ public sealed class McpToolTests(ApiFactory factory)
         // 按短链地址反查：外部集成与模型手里通常只有 URL，没有数据库 ID。
         var fetched = await client.CallToolAsync(
             "shortlink_get",
-            new Dictionary<string, object?> { ["shortUrl"] = shortUrl! },
+            new Dictionary<string, object?> { ["shortUrl"] = shortUrl },
             cancellationToken: TestContext.Current.CancellationToken);
 
         Assert.NotEqual(true, fetched.IsError);
@@ -87,7 +90,7 @@ public sealed class McpToolTests(ApiFactory factory)
 
         var stats = await client.CallToolAsync(
             "shortlink_stats",
-            new Dictionary<string, object?> { ["shortUrl"] = shortUrl!, ["days"] = 7 },
+            new Dictionary<string, object?> { ["shortUrl"] = shortUrl, ["days"] = 7 },
             cancellationToken: TestContext.Current.CancellationToken);
 
         Assert.NotEqual(true, stats.IsError);
@@ -118,16 +121,16 @@ public sealed class McpToolTests(ApiFactory factory)
         var adminToken = await LoginAsync(admin, "admin", AdminPassword);
         var viewerName = $"mcpv{Guid.NewGuid():N}"[..10];
 
-        admin.DefaultRequestHeaders.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", adminToken);
-        var createUser = await admin.PostAsJsonAsync("/api/v1/users", new ShortLink.Contracts.Users.CreateUserRequest
+        admin.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", adminToken);
+        var createUser = await admin.PostAsJsonAsync("/api/v1/users", new CreateUserRequest
         {
             UserName = viewerName,
             DisplayName = "MCP 只读账号",
             Password = "Viewer@123456",
             Role = UserRoles.Viewer,
         }, cancellationToken: TestContext.Current.CancellationToken);
-        var envelope = await createUser.Content.ReadFromJsonAsync<ShortLink.Contracts.ApiResponse<ShortLink.Contracts.Users.ManagedUserDto>>(ApiFactory.JsonOptions, cancellationToken: TestContext.Current.CancellationToken);
-        Assert.True(envelope!.Code == ShortLink.Contracts.BizCodes.Success, envelope.Msg);
+        var envelope = await createUser.Content.ReadFromJsonAsync<ApiResponse<ManagedUserDto>>(ApiFactory.JsonOptions, cancellationToken: TestContext.Current.CancellationToken);
+        Assert.True(envelope!.Code == BizCodes.Success, envelope.Msg);
 
         await using var client = await CreateClientAsync(viewerName, "Viewer@123456");
 
@@ -169,13 +172,11 @@ public sealed class McpToolTests(ApiFactory factory)
         // 200 + 信封，MCP 客户端依然会报错，但错误原因是「响应无法解析」而不是「未认证」，
         // 客户端也就不会去重新认证。必须钉住 401 与 WWW-Authenticate 头。
         var http = factory.CreateClient();
-        using var request = new HttpRequestMessage(HttpMethod.Post, "/mcp")
-        {
-            Content = new StringContent(
-                """{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2026-07-28","capabilities":{},"clientInfo":{"name":"probe","version":"1.0"}}}""",
-                System.Text.Encoding.UTF8,
-                "application/json"),
-        };
+        using var request = new HttpRequestMessage(HttpMethod.Post, "/mcp");
+        request.Content = new StringContent(
+            """{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2026-07-28","capabilities":{},"clientInfo":{"name":"probe","version":"1.0"}}}""",
+            System.Text.Encoding.UTF8,
+            "application/json");
         request.Headers.Accept.ParseAdd("application/json, text/event-stream");
 
         var response = await http.SendAsync(request, TestContext.Current.CancellationToken);
@@ -268,8 +269,8 @@ public sealed class McpToolTests(ApiFactory factory)
             Password = password,
         });
 
-        var envelope = await response.Content.ReadFromJsonAsync<ShortLink.Contracts.ApiResponse<LoginResponse>>(ApiFactory.JsonOptions);
-        Assert.True(envelope!.Code == ShortLink.Contracts.BizCodes.Success, $"登录失败（{userName}）：{envelope.Msg}");
+        var envelope = await response.Content.ReadFromJsonAsync<ApiResponse<LoginResponse>>(ApiFactory.JsonOptions);
+        Assert.True(envelope!.Code == BizCodes.Success, $"登录失败（{userName}）：{envelope.Msg}");
         return envelope.Data!.AccessToken;
     }
 }

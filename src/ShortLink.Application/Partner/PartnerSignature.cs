@@ -33,7 +33,7 @@ public static class PartnerSignature
 
     /// <summary>
     /// RFC3986 编码：空格是 <c>%20</c>，不保留 <c>+</c> 表示空格；
-    /// <see cref="Uri.EscapeDataString"/> 的输出为 UTF-8 + 大写十六进制，与文档一致。
+    /// <see cref="Uri.EscapeDataString(string)"/> 的输出为 UTF-8 + 大写十六进制，与文档一致。
     /// </summary>
     public static string Encode(string value) => Uri.EscapeDataString(value);
 }

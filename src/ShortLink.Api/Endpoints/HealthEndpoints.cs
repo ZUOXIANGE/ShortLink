@@ -1,4 +1,3 @@
-using Microsoft.EntityFrameworkCore;
 using ShortLink.Application.Abstractions;
 using ShortLink.Contracts;
 using ShortLink.Infrastructure.Persistence;

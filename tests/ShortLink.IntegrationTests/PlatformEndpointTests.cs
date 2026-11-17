@@ -9,6 +9,7 @@ using ShortLink.Contracts;
 using ShortLink.Contracts.Analytics;
 using ShortLink.Contracts.Auth;
 using ShortLink.Contracts.Links;
+using ShortLink.Contracts.Security;
 using ShortLink.Contracts.Users;
 using Xunit;
 
@@ -356,7 +357,7 @@ public sealed class PlatformEndpointTests(ApiFactory factory)
         await CreateLinkAsync(client, "abuse01");
 
         var anonymous = factory.CreateClient();
-        var report = await anonymous.PostAsJsonAsync("/api/v1/abuse/reports", new ShortLink.Contracts.Security.AbuseReportRequest
+        var report = await anonymous.PostAsJsonAsync("/api/v1/abuse/reports", new AbuseReportRequest
         {
             Code = "abuse01",
             Reason = "该链接跳转到仿冒的支付页面，请尽快处理。",
@@ -366,7 +367,7 @@ public sealed class PlatformEndpointTests(ApiFactory factory)
         Assert.Equal(BizCodes.Success, envelope!.Code);
 
         var events = await client.GetAsync("/api/v1/security/events?type=abuse_reported&days=7", TestContext.Current.CancellationToken);
-        var page = await events.Content.ReadFromJsonAsync<ApiResponse<PagedResult<ShortLink.Contracts.Security.SecurityEventDto>>>(ApiFactory.JsonOptions, TestContext.Current.CancellationToken);
+        var page = await events.Content.ReadFromJsonAsync<ApiResponse<PagedResult<SecurityEventDto>>>(ApiFactory.JsonOptions, TestContext.Current.CancellationToken);
 
         Assert.Equal(BizCodes.Success, page!.Code);
         Assert.Contains(page.Data!.Items, e => e.Code == "abuse01");
@@ -388,10 +389,8 @@ public sealed class PlatformEndpointTests(ApiFactory factory)
             signature = new string('0', signature.Length);
         }
 
-        using var request = new HttpRequestMessage(HttpMethod.Post, "/api/v1/conversions")
-        {
-            Content = new StringContent(body, Encoding.UTF8, "application/json"),
-        };
+        using var request = new HttpRequestMessage(HttpMethod.Post, "/api/v1/conversions");
+        request.Content = new StringContent(body, Encoding.UTF8, "application/json");
 
         request.Headers.Add("X-Timestamp", timestamp);
         request.Headers.Add("X-Signature", $"sha256={signature}");

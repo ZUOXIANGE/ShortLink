@@ -12,7 +12,7 @@
                 <MudSelect T="long?" @bind-Value="_domainId" Label="目标域名" Variant="Variant.Outlined" Margin="Margin.Dense">
                     @foreach (var domain in Domains)
                     {
-                        <MudSelectItem T="long?" Value="@((long?)domain.Id)">
+                        <MudSelectItem T="long?" Value="@(domain.Id)">
                             @($"{domain.Host}（{domain.Scheme}）")
                         </MudSelectItem>
                     }

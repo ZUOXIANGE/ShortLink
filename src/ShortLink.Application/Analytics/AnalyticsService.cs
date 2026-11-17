@@ -46,7 +46,7 @@ public sealed class AnalyticsService(
         var variants = await BuildVariantsAsync(linkId, variantClicks, conversionAggregate, cancellationToken)
             .ConfigureAwait(false);
 
-        return DtoMapper.ToLinkStatsDto(link, domain, aggregate, conversionAggregate, variants, days);
+        return LinkMapper.ToLinkStatsDto(link, domain, aggregate, conversionAggregate, variants, days);
     }
 
     public async Task<DashboardOverviewDto> GetDashboardAsync(int days, CancellationToken cancellationToken)
@@ -67,7 +67,7 @@ public sealed class AnalyticsService(
             .GetWorkspaceTotalsAsync(workspaceId, fromUtc: null, cancellationToken)
             .ConfigureAwait(false);
 
-        return DtoMapper.ToDashboardDto(counters, domainList.Count, aggregate, conversionCount);
+        return DashboardMapper.ToDashboardDto(counters, domainList.Count, aggregate, conversionCount);
     }
 
     public async Task<IReadOnlyList<ClickLogDto>> GetRecentClicksAsync(

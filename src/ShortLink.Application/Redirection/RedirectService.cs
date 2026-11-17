@@ -148,7 +148,7 @@ public sealed class RedirectService(
 
         var interstitial = link.AntiBlockEnabled
                            && !string.Equals(Redirect.WeChatInterstitial, "off", StringComparison.OrdinalIgnoreCase)
-                           && AccessPolicy.IsWeChatOrQQ(context.UserAgent);
+                           && AccessPolicy.IsWeChatOrQq(context.UserAgent);
 
         ClickQuotaReservation? reservation = null;
         if (decision != AccessDecision.IgnoreCount && link.MaxClicks is not null)

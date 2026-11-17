@@ -180,7 +180,7 @@
                     </MudItem>
                     <MudItem xs="12" sm="6">
                         <MudTextField @bind-Value="_testQuery" Label="查询参数"
-                                      HelperText="形如 utm_source=wechat&from=home" Variant="Variant.Outlined"
+                                      HelperText="@("形如 utm_source=wechat&from=home")" Variant="Variant.Outlined"
                                       Margin="Margin.Dense" Immediate="true" />
                     </MudItem>
                     <MudItem xs="6" sm="3">
@@ -341,7 +341,7 @@
     /// <summary>把占比转成 CSS 宽度。用 InvariantCulture 避免小数点在部分区域设置下变成逗号导致样式失效。</summary>
     private static string BarWidth(double percent)
         => string.Create(
-            System.Globalization.CultureInfo.InvariantCulture,
+            CultureInfo.InvariantCulture,
             $"width:{Math.Clamp(percent, 0, 100):0.##}%;");
 
     private static string ValueLabel(string field, string op)    {

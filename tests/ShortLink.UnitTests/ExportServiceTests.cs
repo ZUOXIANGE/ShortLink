@@ -166,8 +166,8 @@ public sealed class ExportServiceTests
     private sealed class ExportCurrentUser : ICurrentUser
     {
         public long? UserId => 1;
-        public string? UserName => "admin";
-        public string? Role => "owner";
+        public string UserName => "admin";
+        public string Role => "owner";
         public long? WorkspaceId => 1;
         public bool IsAuthenticated => true;
         public UserRole RoleValue => UserRole.Owner;

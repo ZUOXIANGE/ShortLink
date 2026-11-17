@@ -1,6 +1,8 @@
 namespace ShortLink.Contracts.Links;
 
 /// <summary>短链。</summary>
+/// <param name="IpAllowList">IP 白名单原文（逗号 / 换行分隔）。更新是全量覆盖，故详情必须回传原文。</param>
+/// <param name="IpBlockList">IP 黑名单原文。</param>
 public sealed record LinkDto(
     long Id,
     long WorkspaceId,
@@ -19,9 +21,7 @@ public sealed record LinkDto(
     long ClickCount,
     long? MaxClicks,
     string BotPolicy,
-    /// <summary>IP 白名单原文（逗号 / 换行分隔）。更新是全量覆盖，故详情必须回传原文。</summary>
     string? IpAllowList,
-    /// <summary>IP 黑名单原文。</summary>
     string? IpBlockList,
     string? FallbackUrl,
     bool AntiBlockEnabled,

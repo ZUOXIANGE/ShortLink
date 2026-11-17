@@ -2,7 +2,6 @@
 @attribute [Authorize]
 @inject ApiClient Api
 @inject IDialogService DialogService
-@inject ISnackbar Snackbar
 @inject Permissions Perms
 
 <div class="d-flex align-center justify-space-between mb-4 flex-wrap gap-2">
@@ -32,7 +31,7 @@
 
         <MudSelect T="string" Value="_role" Label="角色" Variant="Variant.Outlined" Margin="Margin.Dense"
                    Style="width:160px;" ValueChanged="OnRoleChanged">
-            <MudSelectItem T="string" Value="@((string?)null)">全部角色</MudSelectItem>
+            <MudSelectItem T="string" Value="@(null)">全部角色</MudSelectItem>
             <MudSelectItem T="string" Value="@("owner")">所有者</MudSelectItem>
             <MudSelectItem T="string" Value="@("admin")">管理员</MudSelectItem>
             <MudSelectItem T="string" Value="@("member")">成员</MudSelectItem>
@@ -41,9 +40,9 @@
 
         <MudSelect T="bool?" Value="_enabled" Label="状态" Variant="Variant.Outlined" Margin="Margin.Dense"
                    Style="width:140px;" ValueChanged="OnEnabledChanged">
-            <MudSelectItem T="bool?" Value="@((bool?)null)">全部</MudSelectItem>
-            <MudSelectItem T="bool?" Value="@((bool?)true)">启用</MudSelectItem>
-            <MudSelectItem T="bool?" Value="@((bool?)false)">停用</MudSelectItem>
+            <MudSelectItem T="bool?" Value="@(null)">全部</MudSelectItem>
+            <MudSelectItem T="bool?" Value="@(true)">启用</MudSelectItem>
+            <MudSelectItem T="bool?" Value="@(false)">停用</MudSelectItem>
         </MudSelect>
 
         <MudButton Variant="Variant.Outlined" Color="Color.Primary" StartIcon="@Icons.Material.Filled.Refresh"
@@ -82,9 +81,9 @@
             }
         </MudTd>
         <MudTd DataLabel="最近登录">
-            @(context.LastLoginAtUtc?.ToLocalTime().ToString("yyyy-MM-dd HH:mm") ?? "从未登录")
+            @(context.LastLoginAtUtc?.ToLocalTime().ToString("yyyy-MM-dd HH:mm", CultureInfo.InvariantCulture) ?? "从未登录")
         </MudTd>
-        <MudTd DataLabel="创建时间">@context.CreatedAtUtc.ToLocalTime().ToString("yyyy-MM-dd")</MudTd>
+        <MudTd DataLabel="创建时间">@context.CreatedAtUtc.ToLocalTime().ToString("yyyy-MM-dd", CultureInfo.InvariantCulture)</MudTd>
         <MudTd DataLabel="操作">
             <MudMenu Icon="@Icons.Material.Filled.MoreVert" Size="Size.Small" Dense="true">
                 <MudMenuItem Disabled="@(!CanTouch(context))" OnClick="@(() => EditAsync(context))">编辑 / 改角色</MudMenuItem>

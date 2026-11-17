@@ -36,7 +36,7 @@
 
             @if (IsEdit)
             {
-                <MudSwitch T="bool" Value="@_isEnabled" ValueChanged="@((bool v) => _isEnabled = v)"
+                <MudSwitch T="bool" Value="@_isEnabled" ValueChanged="@(v => _isEnabled = v)"
                            Color="Color.Primary" Label="启用该账号" />
             }
 

@@ -75,7 +75,6 @@ public sealed class ExportService(
         var count = 0;
         await foreach (var link in links
                            .StreamAsync(query, workspaceId, currentUser.UserId, now, cancellationToken)
-                           .WithCancellation(cancellationToken)
                            .ConfigureAwait(false))
         {
             if (count >= MaxRows)
@@ -135,7 +134,6 @@ public sealed class ExportService(
         var count = 0;
         await foreach (var click in analytics
                            .StreamClicksAsync(link.Id, from, cancellationToken)
-                           .WithCancellation(cancellationToken)
                            .ConfigureAwait(false))
         {
             await WriteRowAsync(writer, [

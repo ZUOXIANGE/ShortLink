@@ -1,7 +1,6 @@
 @page "/links/{Id:long}/stats"
 @attribute [Authorize]
 @inject ApiClient Api
-@inject NavigationManager Navigation
 @inject ISnackbar Snackbar
 @inject FileSaver Saver
 
@@ -64,7 +63,7 @@ else
             <MudPaper Elevation="0" Class="kpi pa-4">
                 <div class="kpi-label">转化（@_stats.Days 天）</div>
                 <div class="kpi-value">@_stats.Conversions</div>
-                <div class="kpi-foot">价值 @_stats.ConversionValue.ToString("0.##")</div>
+                <div class="kpi-foot">价值 @_stats.ConversionValue.ToString("0.##", CultureInfo.InvariantCulture)</div>
             </MudPaper>
         </MudItem>
 
@@ -98,10 +97,10 @@ else
                                 <tr>
                                     <td>@variant.Name</td>
                                     <td style="text-align:right;">@variant.Clicks</td>
-                                    <td style="text-align:right;">@variant.Share.ToString("0.##")%</td>
+                                    <td style="text-align:right;">@variant.Share.ToString("0.##", CultureInfo.InvariantCulture)%</td>
                                     <td style="text-align:right;">@variant.Conversions</td>
-                                    <td style="text-align:right;">@(variant.ConversionRate.ToString("0.##"))%</td>
-                                    <td style="text-align:right;">@variant.ConversionValue.ToString("0.##")</td>
+                                    <td style="text-align:right;">@(variant.ConversionRate.ToString("0.##", CultureInfo.InvariantCulture))%</td>
+                                    <td style="text-align:right;">@variant.ConversionValue.ToString("0.##", CultureInfo.InvariantCulture)</td>
                                 </tr>
                             }
                         </tbody>
@@ -153,7 +152,7 @@ else
                         @foreach (var click in _clicks)
                         {
                             <tr>
-                                <td>@click.ClickedAtUtc.ToLocalTime().ToString("MM-dd HH:mm:ss")</td>
+                                <td>@click.ClickedAtUtc.ToLocalTime().ToString("MM-dd HH:mm:ss", CultureInfo.InvariantCulture)</td>
                                 <td class="mono">@(click.Ip ?? "-")</td>
                                 <td>@GeoLabel(click)</td>
                                 <td class="truncate">@(click.Referer ?? "直接访问")</td>

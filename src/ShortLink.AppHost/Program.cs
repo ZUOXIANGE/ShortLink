@@ -1,7 +1,5 @@
-using Aspire.Hosting.ApplicationModel;
 using Aspire.Hosting.Docker.Resources.ServiceNodes;
 using Microsoft.Extensions.Configuration;
-using Projects;
 
 // ─────────────────────────────────────────────────────────────────────────────
 // ShortLink 本地编排入口。
@@ -29,14 +27,14 @@ using Projects;
 var builder = DistributedApplication.CreateBuilder(args);
 
 // 本地公网参数与下面两个固定端口保持一致；发布产物由部署方显式覆盖。
-const int ApiPort = 5080;
-const int WebPort = 5081;
+const int apiPort = 5080;
+const int webPort = 5081;
 
-const string MySqlDevPassword = "ChangeMe_123!";
+const string mySqlDevPassword = "ChangeMe_123!";
 
 // OpenObserve 仅用于本地编排（发布产物不带它），root 账号也相当于本地开发凭据。
-const string OpenObserveUser = "root@shortlink.local";
-const string OpenObserveDevPassword = "Observe@123456";
+const string openObserveUser = "root@shortlink.local";
+const string openObserveDevPassword = "Observe@123456";
 
 // publish 模式下参数不能带开发默认值：生成物里的口令/密钥必须是「运维填」的占位符，
 // 把 dev 口令写进 compose/k8s 是最容易被复制到生产的一类事故。
@@ -63,13 +61,13 @@ var openObserveImageTag = builder.Configuration["ShortLink:OpenObserveImageTag"]
 // 浏览器实际访问的地址，不是容器网络里的服务名；publish 时必须由部署方显式填写。
 var webPublicOrigin = isPublishMode
     ? builder.AddParameter("web-public-origin")
-    : builder.AddParameter("web-public-origin", $"http://localhost:{WebPort}");
+    : builder.AddParameter("web-public-origin", $"http://localhost:{webPort}");
 var apiPublicBaseUrl = isPublishMode
     ? builder.AddParameter("api-public-base-url")
-    : builder.AddParameter("api-public-base-url", $"http://localhost:{ApiPort}");
+    : builder.AddParameter("api-public-base-url", $"http://localhost:{apiPort}");
 
 var api = builder.AddProject<Projects.ShortLink_Api>("api")
-    .WithHttpEndpoint(port: ApiPort, name: "http")
+    .WithHttpEndpoint(port: apiPort, name: "http")
     // 跳转入口必须能从宿主机访问：短链形如 http://<domain>/abc123，暴露不出去等于平台不可用。
     .WithExternalHttpEndpoints()
     // 就绪探针检查 DB 与已配置的缓存；Web 只有在 API 可接流量后才启动。
@@ -101,7 +99,7 @@ api.WithEnvironment("Jwt__SigningKey", jwtSigningKey)
 // 否则建出来的短链全部指向访问者自己的 localhost（这类事故排查成本极高，所以放进 .env 让运维显式填）。
 var defaultDomainHost = isPublishMode
     ? builder.AddParameter("default-domain-host")
-    : builder.AddParameter("default-domain-host", $"localhost:{ApiPort}");
+    : builder.AddParameter("default-domain-host", $"localhost:{apiPort}");
 var defaultDomainScheme = isPublishMode
     ? builder.AddParameter("default-domain-scheme")
     : builder.AddParameter("default-domain-scheme", "http");
@@ -115,7 +113,7 @@ if (useMySql)
     // publish 时刻意不给默认值：生成的 .env / Helm values 里留空，由运维填。
     var mysqlPassword = isPublishMode
         ? builder.AddParameter("mysql-password", secret: true)
-        : builder.AddParameter("mysql-password", MySqlDevPassword, secret: true);
+        : builder.AddParameter("mysql-password", mySqlDevPassword, secret: true);
 
     var mysql = builder.AddMySql("mysql", mysqlPassword)
         .WithImageTag(mySqlImageTag)
@@ -199,24 +197,24 @@ if (useRabbitMq)
 // 时用普通空格即可，只有环境变量形态才需要把空格写成 %20。
 if (!isPublishMode && useOpenObserve)
 {
-    const string OpenObserveOrg = "default";
+    const string openObserveOrg = "default";
 
     var openObserve = builder.AddContainer("openobserve", "openobserve/openobserve", openObserveImageTag)
         // 5080 在宿主机上被 Api 占用，容器端口出宿主一律随机分配（Aspire 会给出实际地址）。
         .WithHttpEndpoint(targetPort: 5080, name: "http")
-        .WithEnvironment("ZO_ROOT_USER_EMAIL", OpenObserveUser)
-        .WithEnvironment("ZO_ROOT_USER_PASSWORD", OpenObserveDevPassword)
+        .WithEnvironment("ZO_ROOT_USER_EMAIL", openObserveUser)
+        .WithEnvironment("ZO_ROOT_USER_PASSWORD", openObserveDevPassword)
         .WithEnvironment("ZO_DATA_DIR", "/data")
         .WithVolume("shortlink-openobserve-data", "/data");
 
     var basicAuth = Convert.ToBase64String(
-        System.Text.Encoding.UTF8.GetBytes($"{OpenObserveUser}:{OpenObserveDevPassword}"));
+        System.Text.Encoding.UTF8.GetBytes($"{openObserveUser}:{openObserveDevPassword}"));
 
     api.WaitFor(openObserve)
         .WithEnvironment(
             "OpenTelemetry__Endpoint",
             ReferenceExpression.Create(
-                $"http://{openObserve.GetEndpoint("http").Property(EndpointProperty.HostAndPort)}/api/{OpenObserveOrg}"))
+                $"http://{openObserve.GetEndpoint("http").Property(EndpointProperty.HostAndPort)}/api/{openObserveOrg}"))
         .WithEnvironment("OTEL_EXPORTER_OTLP_PROTOCOL", "http/protobuf")
         .WithEnvironment("OpenTelemetry__Headers", $"Authorization=Basic {basicAuth}");
 }
@@ -231,7 +229,7 @@ else if (!isPublishMode && !string.IsNullOrWhiteSpace(builder.Configuration["ASP
 
 // 管理后台：纯静态 WASM，只需等 API 起来（种子账号与默认域名由 API 启动时创建）。
 builder.AddProject<Projects.ShortLink_Web>("web")
-    .WithHttpEndpoint(port: WebPort, name: "http")
+    .WithHttpEndpoint(port: webPort, name: "http")
     .WithExternalHttpEndpoints()
     .WithEnvironment("API_BASE_URL", apiPublicBaseUrl)
     // 默认的托管方式是 DevServer——那是开发服务器，会被当成「生产镜像」发出去。
@@ -253,8 +251,7 @@ builder.AddProject<Projects.ShortLink_Web>("web")
 if (isPublishMode)
 {
     var target = builder.Configuration["ShortLink:PublishTarget"]
-                 ?? builder.ExecutionContext.PublisherName
-                 ?? "docker-compose";
+                 ?? builder.ExecutionContext.PublisherName;
 
     if (string.Equals(target, "kubernetes", StringComparison.OrdinalIgnoreCase))
     {

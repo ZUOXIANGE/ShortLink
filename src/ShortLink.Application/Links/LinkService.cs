@@ -6,11 +6,8 @@ using ShortLink.Application.Validation;
 using ShortLink.Application.Workspaces;
 using ShortLink.Contracts;
 using ShortLink.Contracts.Links;
-using ShortLink.Contracts.Security;
 using ShortLink.Domain.Domains;
 using ShortLink.Domain.Links;
-using ShortLink.Domain.Security;
-using ShortLink.Domain.Users;
 
 namespace ShortLink.Application.Links;
 
@@ -385,7 +382,7 @@ public sealed class LinkService(
                         }
 
                         invalidated.Add((link.DomainId, link.Code));
-                        link.MoveToDomain(targetDomain!.Id, now);
+                        link.MoveToDomain(targetDomain.Id, now);
                         break;
 
                     case BatchActions.ChangeExpiry:

@@ -145,7 +145,7 @@ public static class MessagingSetup
                 "Messaging:Durable 为 true 时必须配置 Database:ConnectionString（消息存储复用业务库）");
         }
 
-        switch (database.Provider?.Trim().ToLowerInvariant())
+        switch (database.Provider.Trim().ToLowerInvariant())
         {
             case "sqlite":
                 wolverine.PersistMessagesWithSqlite(connectionString);

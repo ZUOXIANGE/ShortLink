@@ -1,13 +1,8 @@
 using System.Globalization;
 using System.Net;
 using System.Text.Json;
-using System.Threading.RateLimiting;
 using Asp.Versioning;
-using Microsoft.AspNetCore.Diagnostics;
 using Microsoft.AspNetCore.HttpOverrides;
-using Microsoft.AspNetCore.RateLimiting;
-using Microsoft.EntityFrameworkCore;
-using ModelContextProtocol.AspNetCore;
 using OpenTelemetry.Exporter;
 using OpenTelemetry.Logs;
 using OpenTelemetry.Metrics;
@@ -21,17 +16,15 @@ using ShortLink.Api.Endpoints;
 using ShortLink.Api.Infrastructure;
 using ShortLink.Application;
 using ShortLink.Application.Abstractions;
-using ShortLink.Application.Options;
 using ShortLink.Contracts;
 using ShortLink.Infrastructure;
 using ShortLink.Infrastructure.Diagnostics;
-using ShortLink.Infrastructure.Options;
 using ShortLink.Infrastructure.Persistence;
 using ShortLink.Mcp;
 using ShortLink.Mcp.Diagnostics;
 
 // 控制台与文本文件共用同一份易读模板；结构化文件另走 CLEF（每行一个 JSON）。
-const string ConsoleTemplate = "[{Timestamp:HH:mm:ss} {Level:u3}] {Message:lj} {Properties:j}{NewLine}{Exception}";
+const string consoleTemplate = "[{Timestamp:HH:mm:ss} {Level:u3}] {Message:lj} {Properties:j}{NewLine}{Exception}";
 
 // 启动期日志（Host 尚未建好时）走控制台文本模板，与正式运行的 Console sink 一致。
 Log.Logger = new LoggerConfiguration()
@@ -69,7 +62,7 @@ try
             .Enrich.WithSpan()
             .WriteTo.Console(
                 formatProvider: CultureInfo.InvariantCulture,
-                outputTemplate: ConsoleTemplate);
+                outputTemplate: consoleTemplate);
 
         if (fileOptions.GetValue("Enabled", true))
         {
@@ -91,7 +84,7 @@ try
                 configuration.WriteTo.File(
                     ResolvePath(textPath),
                     formatProvider: CultureInfo.InvariantCulture,
-                    outputTemplate: ConsoleTemplate,
+                    outputTemplate: consoleTemplate,
                     rollingInterval: RollingInterval.Day,
                     fileSizeLimitBytes: 64 * 1024 * 1024,
                     rollOnFileSizeLimit: true,
@@ -230,7 +223,7 @@ try
             ? new Uri(otlpEndpoint!)
             : new Uri($"{otlpEndpoint!.TrimEnd('/')}/{signalPath}");
 
-    void ConfigureOtlp(OpenTelemetry.Exporter.OtlpExporterOptions exporter, string signalPath)
+    void ConfigureOtlp(OtlpExporterOptions exporter, string signalPath)
     {
         exporter.Endpoint = SignalEndpoint(signalPath);
         exporter.Protocol = exportProtocol;
@@ -402,19 +395,15 @@ finally
     await Log.CloseAndFlushAsync().ConfigureAwait(false);
 }
 
-/// <summary>
-/// 启动期把缓存拓扑说清楚。
-/// <para>
-/// 未配置 Redis 背板时，短链更新/停用/删除只失效<b>本实例</b>的缓存，其他实例要靠 TTL 自然过期。
-/// 这个降级不会报错、不会让探针变红，只会静默地让一条已停用的短链在多实例上继续跳转——
-/// 所以在这里显式打出来，并且用环境线索决定音量。
-/// </para>
-/// <para>
-/// 音量判据是 <c>KUBERNETES_SERVICE_HOST</c>：容器编排环境下滚动更新就是这个形态，
-/// 多副本是常态，值得 Warning；本机 <c>dotnet run</c> 单实例，喊 Warning 只会让人习惯性忽略告警。
-/// 这个判据不是精确的（单副本 k8s 也会 Warning），但错在「多说一句」而非「漏报」。
-/// </para>
-/// </summary>
+// 启动期把缓存拓扑说清楚。
+//
+// 未配置 Redis 背板时，短链更新/停用/删除只失效本实例的缓存，其他实例要靠 TTL 自然过期。
+// 这个降级不会报错、不会让探针变红，只会静默地让一条已停用的短链在多实例上继续跳转——
+// 所以在这里显式打出来，并且用环境线索决定音量。
+//
+// 音量判据是 KUBERNETES_SERVICE_HOST：容器编排环境下滚动更新就是这个形态，
+// 多副本是常态，值得 Warning；本机 dotnet run 单实例，喊 Warning 只会让人习惯性忽略告警。
+// 这个判据不是精确的（单副本 k8s 也会 Warning），但错在「多说一句」而非「漏报」。
 static void LogCacheTopology(WebApplication app)
 {
     var topology = app.Services.GetRequiredService<ICacheTopology>();
@@ -439,11 +428,9 @@ static void LogCacheTopology(WebApplication app)
     }
 }
 
-/// <summary>
-/// 第三方签名的重放保护形态：没有 Redis 时 nonce 只在单个实例内有效。
-/// 这和多实例缓存失效一样，不会报错、不会让探针变红，只会在跨实例重放时静默放行，
-/// 所以启动期必须显式说出来。
-/// </summary>
+// 第三方签名的重放保护形态：没有 Redis 时 nonce 只在单个实例内有效。
+// 这和多实例缓存失效一样，不会报错、不会让探针变红，只会在跨实例重放时静默放行，
+// 所以启动期必须显式说出来。
 static void LogPartnerAuthTopology(WebApplication app)
 {
     var nonces = app.Services.GetRequiredService<IApiNonceStore>();

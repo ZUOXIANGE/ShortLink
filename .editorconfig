@@ -85,3 +85,33 @@ generated_code = true
 
 [**/Migrations/**.Snapshot.cs]
 generated_code = true
+
+# 契约 / DTO record 的字段只用于序列化，不参与服务端读取；
+# ReSharper 的「位置属性未被访问」在这类类型上属于预期噪音。
+[src/ShortLink.Contracts/**.cs]
+resharper_not_accessed_positional_property_global_highlighting = none
+resharper_unused_auto_property_accessor_global_highlighting = none
+
+[src/ShortLink.Mcp/Models/**.cs]
+resharper_not_accessed_positional_property_global_highlighting = none
+
+[src/ShortLink.Application/Abstractions/**.cs]
+resharper_not_accessed_positional_property_global_highlighting = none
+
+[src/ShortLink.Application/Messaging/**.cs]
+resharper_not_accessed_positional_property_global_highlighting = none
+
+[src/ShortLink.Application/Redirection/RedirectService.cs]
+resharper_not_accessed_positional_property_global_highlighting = none
+
+# 配置对象由 ConfigurationBinder 通过 setter 反射赋值。
+[src/ShortLink.Application/Options/**.cs]
+resharper_unused_auto_property_accessor_global_highlighting = none
+
+# 实体主键的私有 setter 由 EF Core 反射赋值。
+[src/ShortLink.Domain/**.cs]
+resharper_unused_auto_property_accessor_local_highlighting = none
+
+# 持久化实体（如租约表）的私有 setter 同样由 EF Core 反射赋值。
+[src/ShortLink.Infrastructure/Persistence/**.cs]
+resharper_unused_auto_property_accessor_local_highlighting = none

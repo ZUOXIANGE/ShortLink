@@ -1,6 +1,6 @@
 @using Microsoft.Extensions.Configuration
 @inject ApiClient Api
-@inject IJSRuntime JS
+@inject IJSRuntime Js
 @inject ISnackbar Snackbar
 
 <MudDialog>
@@ -110,7 +110,7 @@
 
         try
         {
-            await JS.InvokeVoidAsync("navigator.clipboard.writeText", _key.Secret);
+            await Js.InvokeVoidAsync("navigator.clipboard.writeText", _key.Secret);
             Snackbar.Add("密钥已复制", Severity.Success);
         }
         catch (JSException)

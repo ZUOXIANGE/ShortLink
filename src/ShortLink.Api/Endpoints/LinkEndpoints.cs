@@ -1,7 +1,6 @@
 using System.Globalization;
 using System.Net.Http.Headers;
 using System.Text;
-using Microsoft.AspNetCore.Mvc;
 using ShortLink.Api.Infrastructure;
 using ShortLink.Application.Analytics;
 using ShortLink.Application.Links;

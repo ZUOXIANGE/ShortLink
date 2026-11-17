@@ -3,7 +3,7 @@ namespace ShortLink.Mcp.Models;
 /// <summary>
 /// 工具返回给模型的短链视图。
 /// <para>
-/// 刻意不复用 <see cref="LinkDto"/>：那是给管理后台的完整视图（30 个字段，含 IP 名单原文、
+/// 刻意不复用 <see cref="ShortLink.Contracts.Links.LinkDto"/>：那是给管理后台的完整视图（30 个字段，含 IP 名单原文、
 /// 转化密钥有无、创建人 ID 等）。工具返回值会进模型上下文，字段越多越占 token、越容易干扰判断，
 /// 这里只保留「判断与下一步动作」真正需要的字段。
 /// </para>

@@ -117,13 +117,13 @@ public static class RateLimitingSetup
     {
         var partitionKey = $"{policy}:{(keySelector ?? ClientKey)(context)}";
 
-        return RateLimitPartition.Get(partitionKey, _ => CreateLimiter(context.RequestServices, policy, partitionKey, permitLimit));
+        return RateLimitPartition.Get(partitionKey, _ => CreateLimiter(context.RequestServices, partitionKey, permitLimit));
     }
 
     /// <summary>调用者身份：优先 JWT 的 <c>sub</c>，没有令牌时回落 IP。</summary>
     private static string CallerKey(HttpContext context)
     {
-        var subject = context.User?.FindFirst("sub")?.Value;
+        var subject = context.User.FindFirst("sub")?.Value;
         return string.IsNullOrWhiteSpace(subject) ? ClientKey(context) : $"user:{subject}";
     }
 
@@ -136,7 +136,7 @@ public static class RateLimitingSetup
     /// <summary>第三方分区键：优先用凭据标识，未认证时回落 IP（仅兜底）。</summary>
     private static string PartnerKey(HttpContext context)
     {
-        var clientId = context.User?.FindFirst("client_id")?.Value;
+        var clientId = context.User.FindFirst("client_id")?.Value;
         return string.IsNullOrWhiteSpace(clientId) ? ClientKey(context) : $"client:{clientId}";
     }
 
@@ -155,7 +155,7 @@ public static class RateLimitingSetup
             1);
     }
 
-    private static RateLimiter CreateLimiter(IServiceProvider services, string policy, string partitionKey, int permitLimit)
+    private static RateLimiter CreateLimiter(IServiceProvider services, string partitionKey, int permitLimit)
     {
         var distributed = services.GetService<IConnectionMultiplexer>();
         var useDistributed = services

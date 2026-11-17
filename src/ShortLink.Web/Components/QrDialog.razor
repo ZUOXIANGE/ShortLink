@@ -1,6 +1,6 @@
 @using QRCoder
 @inject FileSaver Saver
-@inject IJSRuntime JS
+@inject IJSRuntime Js
 @inject ISnackbar Snackbar
 
 <MudDialog>
@@ -110,7 +110,7 @@
     {
         try
         {
-            await JS.InvokeVoidAsync("navigator.clipboard.writeText", Url);
+            await Js.InvokeVoidAsync("navigator.clipboard.writeText", Url);
             Snackbar.Add("已复制到剪贴板", Severity.Success);
         }
         catch (JSException)

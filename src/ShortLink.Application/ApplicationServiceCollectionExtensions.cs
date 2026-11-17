@@ -8,7 +8,6 @@ using ShortLink.Application.Partner;
 using ShortLink.Application.Redirection;
 using ShortLink.Application.Security;
 using ShortLink.Application.Users;
-using ShortLink.Application.Validation;
 using ShortLink.Application.Workspaces;
 using ShortLink.Contracts.Auth;
 using ShortLink.Contracts.Domains;

@@ -1,4 +1,3 @@
-using Microsoft.AspNetCore.Mvc;
 using ShortLink.Api.Infrastructure;
 using ShortLink.Application.Analytics;
 using ShortLink.Application.Links;

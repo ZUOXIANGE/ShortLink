@@ -27,7 +27,7 @@ public sealed class FusionLinkCache(IFusionCache cache, IOptions<CacheOptions> o
 
         return await cache.GetOrSetAsync<CachedLink>(
             LinkKey(domainId, code),
-            (context, token) => factory(token),
+            (_, token) => factory(token),
             options: entryOptions,
             tags: null,
             token: cancellationToken);
@@ -49,7 +49,7 @@ public sealed class FusionLinkCache(IFusionCache cache, IOptions<CacheOptions> o
 
         return await cache.GetOrSetAsync<CachedDomain>(
             DomainKey(host),
-            (context, token) => factory(token),
+            (_, token) => factory(token),
             options: entryOptions,
             tags: [DomainTag],
             token: cancellationToken);

@@ -49,7 +49,7 @@ public static partial class McpMapper
     private static double RoundRate(double value) => Math.Round(value, 4);
 
     [UserMapping(Default = false)]
-    private static string? HideProvince(string? value) => null;
+    private static string? HideProvince(string? _) => null;
 
     [UserMapping(Default = false)]
     private static string? TruncateReferer(string? value)

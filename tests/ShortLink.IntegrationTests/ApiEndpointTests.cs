@@ -4,7 +4,6 @@ using System.Text.Json;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.Extensions.Configuration;
-using Microsoft.Extensions.Hosting;
 using ShortLink.Contracts;
 using ShortLink.Contracts.Auth;
 using ShortLink.Contracts.Links;
@@ -101,7 +100,7 @@ public sealed class ApiEndpointTests(ApiFactory factory)
 
         var envelope = await response.Content.ReadFromJsonAsync<ApiResponse<JsonElement>>(ApiFactory.JsonOptions, TestContext.Current.CancellationToken);
         Assert.NotNull(envelope);
-        Assert.Equal(BizCodes.Unauthorized, envelope!.Code);
+        Assert.Equal(BizCodes.Unauthorized, envelope.Code);
         Assert.Equal(JsonValueKind.Null, envelope.Data.ValueKind);
     }
 
@@ -119,7 +118,7 @@ public sealed class ApiEndpointTests(ApiFactory factory)
         var envelope = await response.Content.ReadFromJsonAsync<ApiResponse<LoginResponse>>(ApiFactory.JsonOptions, TestContext.Current.CancellationToken);
 
         Assert.NotNull(envelope);
-        Assert.Equal(BizCodes.Success, envelope!.Code);
+        Assert.Equal(BizCodes.Success, envelope.Code);
         Assert.NotNull(envelope.Data);
         Assert.False(string.IsNullOrWhiteSpace(envelope.Data!.AccessToken));
         Assert.Equal("admin", envelope.Data.User.UserName);

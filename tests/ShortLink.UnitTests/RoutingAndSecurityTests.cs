@@ -156,7 +156,7 @@ public sealed class RouteSelectorTests
         var parsed = RouteConditions.TryParse(conditions.ToJson());
 
         Assert.NotNull(parsed);
-        Assert.Equal(RouteMatchMode.Any, parsed!.Match);
+        Assert.Equal(RouteMatchMode.Any, parsed.Match);
         Assert.Single(parsed.Items);
         Assert.Equal("WeChat", parsed.Items[0].Value);
     }
@@ -284,11 +284,11 @@ public sealed class AccessPolicyTests
     }
 
     [Fact]
-    public void IsWeChatOrQQ_Should_Detect_InApp_Browsers()
+    public void IsWeChatOrQq_Should_Detect_InApp_Browsers()
     {
-        Assert.True(AccessPolicy.IsWeChatOrQQ("Mozilla/5.0 MicroMessenger/8.0.40"));
-        Assert.True(AccessPolicy.IsWeChatOrQQ("Mozilla/5.0 QQ/8.9.33.10396"));
-        Assert.False(AccessPolicy.IsWeChatOrQQ("Mozilla/5.0 Chrome/126.0.0.0"));
+        Assert.True(AccessPolicy.IsWeChatOrQq("Mozilla/5.0 MicroMessenger/8.0.40"));
+        Assert.True(AccessPolicy.IsWeChatOrQq("Mozilla/5.0 QQ/8.9.33.10396"));
+        Assert.False(AccessPolicy.IsWeChatOrQq("Mozilla/5.0 Chrome/126.0.0.0"));
     }
 }
 
