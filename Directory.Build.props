@@ -25,7 +25,8 @@
   </PropertyGroup>
 
   <!--
-    Husky.Net：还原阶段自动安装 Git 钩子，钩子定义在 .husky/（pre-commit 只格式化暂存文件）。
+    Husky.Net：还原阶段自动安装 Git 钩子，钩子定义在 .husky/
+    （pre-commit 校验暂存 *.cs 的格式，commit-msg 校验提交信息格式）。
     仅在已初始化的仓库里执行：无 .git（纯源码打包）、CI、或显式 HUSKY=0 时跳过，构建不受影响。
   -->
   <Target Name="HuskyInstall"

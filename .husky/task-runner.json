@@ -2,10 +2,17 @@
   "$schema": "https://alirezanet.github.io/Husky.Net/schema.json",
   "tasks": [
     {
-      "group": "pre-commit",
-      "name": "dotnet-format",
+      "group": "pre-commit-format",
+      "name": "dotnet-format-fix",
       "command": "dotnet",
       "args": ["format", "ShortLink.slnx", "--include", "${staged}"],
+      "include": ["**/*.cs"]
+    },
+    {
+      "group": "pre-commit-verify",
+      "name": "dotnet-format-verify",
+      "command": "dotnet",
+      "args": ["format", "ShortLink.slnx", "--verify-no-changes", "--include", "${staged}"],
       "include": ["**/*.cs"]
     }
   ]

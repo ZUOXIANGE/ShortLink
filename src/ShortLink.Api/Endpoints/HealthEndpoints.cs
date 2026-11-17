@@ -40,21 +40,21 @@ public static class HealthEndpoints
         app.MapGet("/health/info", (
                 ICacheTopology cacheTopology,
                 IStatisticsCalendar calendar) => ApiResponse.Ok(new
-            {
-                service = "ShortLink.Api",
-                status = "ok",
-
-                // 暴露缓存拓扑而不是留一句「请自行确认」：
-                // in-process 意味着停用/删除一条短链后，其他实例最长要等 LinkTtlSeconds 才生效。
-                cache = new
                 {
-                    backplane = cacheTopology.Backplane,
-                    crossInstanceInvalidation = cacheTopology.HasDistributedBackplane,
-                    linkTtlSeconds = cacheTopology.LinkTtlSeconds,
-                },
+                    service = "ShortLink.Api",
+                    status = "ok",
 
-                statistics = new { timeZone = calendar.TimeZoneId },
-            }))
+                    // 暴露缓存拓扑而不是留一句「请自行确认」：
+                    // in-process 意味着停用/删除一条短链后，其他实例最长要等 LinkTtlSeconds 才生效。
+                    cache = new
+                    {
+                        backplane = cacheTopology.Backplane,
+                        crossInstanceInvalidation = cacheTopology.HasDistributedBackplane,
+                        linkTtlSeconds = cacheTopology.LinkTtlSeconds,
+                    },
+
+                    statistics = new { timeZone = calendar.TimeZoneId },
+                }))
             .AllowAnonymous()
             .ExcludeFromDescription();
 

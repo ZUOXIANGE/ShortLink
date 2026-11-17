@@ -1,5 +1,5 @@
-using ShortLink.Contracts.Security;
 using ShortLink.Contracts;
+using ShortLink.Contracts.Security;
 using ShortLink.Domain.Security;
 
 namespace ShortLink.Application.Abstractions.Persistence;

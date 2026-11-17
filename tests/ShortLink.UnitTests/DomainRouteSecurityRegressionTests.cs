@@ -628,7 +628,7 @@ public sealed class DomainRouteSecurityRegressionTests
         IsEnabled = true,
     };
 
-    private static SaveLinkRoutesRequest Routes(params LinkRouteInput[] routes) => new() { Routes = [..routes] };
+    private static SaveLinkRoutesRequest Routes(params LinkRouteInput[] routes) => new() { Routes = [.. routes] };
 
     private static LinkRouteInput Route(string name, string target) => new()
     {

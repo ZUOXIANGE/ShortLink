@@ -1,6 +1,6 @@
-using Xunit;
 using ShortLink.Domain.Domains;
 using ShortLink.Domain.Links;
+using Xunit;
 
 namespace ShortLink.UnitTests;
 

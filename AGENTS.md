@@ -39,7 +39,7 @@ Api → Infrastructure → Application → Domain
 - **来源地一律走 `IGeoLocationResolver`**，不要在端点里直接读 `X-Country` 一类请求头。采集处**禁止** `HtmlEncode`/`Sanitize`：条件路由拿入库值跟规则比对，编码一次就永远不命中，编码属于渲染职责。
 - 启动期能验的配置错误就让它启动失败（时区 id、mmdb 文件是否存在、Kafka 地址），不要留到第一次请求——静默回落的症状（「配了库但省份还是空」）排查成本远高于起不来。
 - 部署形态相关的事实要暴露成可读数据（如 `/health/info` 的 `cache.backplane`），不要只在文档里写「注意多实例」：文档不会进值班的视野，端点会。
-- Git 钩子由 Husky.Net 驱动（`.husky/task-runner.json`）：`pre-commit` 只对暂存 `*.cs` 跑 `dotnet format`，不要往钩子里加全量 build / test；临时跳过用 `HUSKY=0 git commit`。
+- Git 钩子由 Husky.Net 驱动（`.husky/` 下的 sh 脚本 + `task-runner.json` 的 format 任务组）：`pre-commit` 对暂存 `*.cs` 先跑 `dotnet format --verify-no-changes`，不合规时自动 `dotnet format` 改写并重新 `git add`，改写后仍不合规才阻断；`commit-msg` 校验 Conventional Commits 格式（`<type>(<scope>): <subject>`）；不要往钩子里加全量 build / test；临时跳过用 `HUSKY=0 git commit`。
 
 ## 多租户与权限
 

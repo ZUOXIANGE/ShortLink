@@ -3,8 +3,8 @@ using Microsoft.Extensions.Options;
 using ShortLink.Application.Abstractions;
 using ShortLink.Infrastructure.Caching;
 using ShortLink.Infrastructure.Options;
-using ZiggyCreatures.Caching.Fusion;
 using Xunit;
+using ZiggyCreatures.Caching.Fusion;
 
 namespace ShortLink.UnitTests;
 

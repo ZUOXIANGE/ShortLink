@@ -1,5 +1,4 @@
 using System.Runtime.CompilerServices;
-using Xunit;
 using ShortLink.Application.Abstractions;
 using ShortLink.Application.Abstractions.Persistence;
 using ShortLink.Application.Redirection;
@@ -7,6 +6,7 @@ using ShortLink.Contracts;
 using ShortLink.Contracts.Links;
 using ShortLink.Domain.Domains;
 using ShortLink.Domain.Links;
+using Xunit;
 
 namespace ShortLink.UnitTests;
 
