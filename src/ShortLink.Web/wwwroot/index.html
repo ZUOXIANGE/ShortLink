@@ -4,11 +4,13 @@
 <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <!-- 静态托管（如 OSS）拿不到响应头时的基线防护；完整安全头（含 frame-ancestors）由 nginx 下发。 -->
+    <meta name="referrer" content="no-referrer" />
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-eval' 'wasm-unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self' data:; connect-src 'self' http: https:; object-src 'none'; base-uri 'self'; form-action 'self'; worker-src 'self' blob:" />
     <title>ShortLink · 短链管理平台</title>
     <base href="/" />
 
-    <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;700&display=swap" rel="stylesheet" />
-    <!-- 内联 favicon：省掉一次 404 请求，也避免控制台噪声 -->
+    <!-- 主题使用系统字体，不再外链 Google Fonts：减少一处第三方来源，离线/内网部署也不会阻塞渲染。 -->
     <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%23D70B2A'/%3E%3Cpath d='M13 22a6 6 0 0 1 0-12h3v3h-3a3 3 0 0 0 0 6h3v3h-3zm6-12h3a6 6 0 0 1 0 12h-3v-3h3a3 3 0 0 0 0-6h-3V10z' fill='%23fff'/%3E%3C/svg%3E" />
     <link href="_content/MudBlazor/MudBlazor.min.css" rel="stylesheet" />
     <link href="css/app.css" rel="stylesheet" />
