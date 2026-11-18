@@ -93,6 +93,14 @@ dotnet run --project src/ShortLink.AppHost
 
 OpenObserve 的 OTLP 入口是 `http://<host>:<port>/api/default`、HTTP Basic 认证；AppHost 会自动把端点、协议与 `Authorization` 头注入 API，无需手工配置。
 
+本地遥测只能在 OpenObserve 与 Aspire 仪表盘之间二选一（OTel SDK 单端点），切换用配置：
+
+```bash
+dotnet run --project src/ShortLink.AppHost -- --ShortLink:TelemetryTarget=aspire
+```
+
+不切时默认发 OpenObserve；切到 `aspire` 后 `openobserve` 容器不会启动，traces/metrics/logs 直接进仪表盘。
+
 默认用 Docker 拉起 MySQL 8.4 与 Redis，按依赖顺序启动 API 与 Web。零容器模式：
 
 ```bash

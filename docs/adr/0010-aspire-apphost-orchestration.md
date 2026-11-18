@@ -58,6 +58,7 @@ api.WithEnvironment("OpenTelemetry__Endpoint", builder.Configuration["ASPIRE_DAS
 | `ShortLink:MySqlImageTag` / `ShortLink:MySqlVersion` | `8.4` / `8.4.0` | 必须成对维护：`ServerVersion` 决定 EF 方言分支 |
 | `ShortLink:UseRedis` | `true` | 关掉即退回进程内缓存与本地限流窗口 |
 | `ShortLink:UseKafka` | `false` | 打开会额外拉 Kafka 容器，并把 `Messaging:Transport` 切成 `kafka` |
+| `ShortLink:TelemetryTarget` | `openobserve` | 遥测目标二选一：`openobserve`（容器里看）或 `aspire`（仪表盘里看）；OTel SDK 单端点，不做双写 |
 
 默认值刻意选「与生产同构」而不是「最省资源」：本地跑不到 MySQL 迁移与 Redis Lua 限流，等于把这两块的风险全部推到部署后。
 

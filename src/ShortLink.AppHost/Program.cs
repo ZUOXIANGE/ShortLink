@@ -53,7 +53,8 @@ if (useKafka && useRabbitMq)
     throw new InvalidOperationException(
         "ShortLink:UseKafka 与 ShortLink:UseRabbitMq 不能同时打开。");
 }
-var useOpenObserve = ReadBool(builder.Configuration, "ShortLink:UseOpenObserve", fallback: true);
+// 本地遥测目标二选一（OTel SDK 单端点）：openobserve（默认，容器里看）| aspire（仪表盘里看）。
+var telemetryTarget = ReadTelemetryTarget(builder.Configuration);
 var mySqlImageTag = builder.Configuration["ShortLink:MySqlImageTag"] ?? "8.4";
 var mySqlServerVersion = builder.Configuration["ShortLink:MySqlVersion"] ?? "8.4.0";
 var openObserveImageTag = builder.Configuration["ShortLink:OpenObserveImageTag"] ?? "v1.1.2";
@@ -187,15 +188,15 @@ if (useRabbitMq)
                 $"amqp://{rabbitMqUser.Resource}:{rabbitMqPassword.Resource}@{rabbitMq.GetEndpoint("tcp").Property(EndpointProperty.HostAndPort)}"));
 }
 
-// ── 可观测性后端：OpenObserve（仅本地编排）──────────────────────────────
-// 本地默认把 traces/metrics/logs 全部发进 OpenObserve；发布产物刻意不包含它，
-// 生产由部署方通过标准 OTEL_EXPORTER_OTLP_* 变量接入自己的实例。
+// ── 可观测性后端（仅本地编排）────────────────────────────────────────
+// OTel .NET SDK 一次只认一个 OTLP 端点，所以本地只能二选一，由 ShortLink:TelemetryTarget 决定：
+//   openobserve（默认）—— 容器内看 traces/metrics/logs；
+//   aspire             —— 发进 Aspire 仪表盘（DCP 已注入端点与 x-otlp-api-key）。
+// 发布产物刻意不包含 OpenObserve，生产由部署方通过标准 OTEL_EXPORTER_OTLP_* 变量接入自己的实例。
 //
-// 它的 OTLP/HTTP 入口形如 /api/<org>/v1/{traces,metrics,logs}：这里注入「基础地址」，
-// 由 Api 按信号拼后缀（OpenTelemetry:Endpoint 的约定）。认证是 HTTP Basic，
-// 凭据为登录邮箱:密码的 Base64；代码里配置（而非 OTEL_EXPORTER_OTLP_HEADERS）
-// 时用普通空格即可，只有环境变量形态才需要把空格写成 %20。
-if (!isPublishMode && useOpenObserve)
+// OpenObserve 的 OTLP/HTTP 入口形如 /api/<org>/v1/{traces,metrics,logs}：注入「基础地址」，
+// 由 Api 按信号拼后缀。认证是 HTTP Basic，凭据为登录邮箱:密码的 Base64。
+if (!isPublishMode && telemetryTarget == "openobserve")
 {
     const string openObserveOrg = "default";
 
@@ -218,13 +219,22 @@ if (!isPublishMode && useOpenObserve)
         .WithEnvironment("OTEL_EXPORTER_OTLP_PROTOCOL", "http/protobuf")
         .WithEnvironment("OpenTelemetry__Headers", $"Authorization=Basic {basicAuth}");
 }
-else if (!isPublishMode && !string.IsNullOrWhiteSpace(builder.Configuration["ASPIRE_DASHBOARD_OTLP_ENDPOINT_URL"]))
+else if (!isPublishMode && telemetryTarget == "aspire")
 {
-    // 关掉 OpenObserve 时退回 Aspire 仪表盘；不猜端口——没配就让遥测留空，
-    // 也不要让 Api 每次导出都报连接失败。
-    api.WithEnvironment(
-        "OpenTelemetry__Endpoint",
-        builder.Configuration["ASPIRE_DASHBOARD_OTLP_ENDPOINT_URL"]!);
+    var dashboardOtlpEndpoint = builder.Configuration["ASPIRE_DASHBOARD_OTLP_ENDPOINT_URL"];
+
+    if (!string.IsNullOrWhiteSpace(dashboardOtlpEndpoint))
+    {
+        // 只有走 `dotnet run`（launchSettings 注入端点）时才发；不猜端口，
+        // 没配就让遥测留空，也不要让 Api 每次导出都报连接失败。
+        //
+        // 协议必须显式写 grpc：编排器给项目进程注入的 OTEL_EXPORTER_OTLP_PROTOCOL 是
+        // http/protobuf，而仪表盘的 OTLP 入口只吃 gRPC，不覆盖会一直连不上。
+        // 鉴权头不用管：DCP 注入的 OTEL_EXPORTER_OTLP_HEADERS 已带 x-otlp-api-key，
+        // Api 侧未显式设置 Headers 时 SDK 会沿用该标准变量。
+        api.WithEnvironment("OpenTelemetry__Endpoint", dashboardOtlpEndpoint)
+            .WithEnvironment("OTEL_EXPORTER_OTLP_PROTOCOL", "grpc");
+    }
 }
 
 // 管理后台：纯静态 WASM，只需等 API 起来（种子账号与默认域名由 API 启动时创建）。
@@ -342,3 +352,21 @@ builder.Build().Run();
 // 只为两个开关多带一个包不值得，配置少一个间接依赖就少一处版本要对齐。
 static bool ReadBool(IConfiguration configuration, string key, bool fallback) =>
     bool.TryParse(configuration[key], out var value) ? value : fallback;
+
+// 遥测目标写错时直接起不来：静默回落成「配了 aspire 但数据全在 OpenObserve」排查成本很高。
+static string ReadTelemetryTarget(IConfiguration configuration)
+{
+    var configured = configuration["ShortLink:TelemetryTarget"];
+    if (string.IsNullOrWhiteSpace(configured))
+    {
+        return "openobserve";
+    }
+
+    return configured.Trim().ToLowerInvariant() switch
+    {
+        "openobserve" => "openobserve",
+        "aspire" => "aspire",
+        _ => throw new InvalidOperationException(
+            $"ShortLink:TelemetryTarget 只能是 openobserve 或 aspire，当前为 '{configured}'。"),
+    };
+}

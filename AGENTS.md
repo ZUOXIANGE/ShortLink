@@ -118,6 +118,7 @@ Api → Infrastructure → Application → Domain
 - 对外端口固定 5080 / 5081（WASM 的 `ApiBaseUrl` 与 `Cors:AllowedOrigins` 是浏览器读的静态配置，随机端口会表现成「登录不上」）；**依赖容器与 Aspire 自身内部端口一律留空自动分配**，别写死——本机随便一个安全客户端就可能占掉你固定的端口。
 - 连接串不要图省事直接吃 `AddMySql` 生成的：项目依赖 `AllowUserVariables` / `UseAffectedRows` / `CharSet=utf8mb4`。Redis 反过来必须用资源自带的 `ConnectionStringExpression`：容器默认 `requirepass` 且口令随机，自己拼 `host:port` 的症状是只有 `/health/ready` 的 cache 一直 fail。
 - 新增依赖（Kafka、PostgreSQL…）用 AppHost 配置开关暴露，默认值取「与生产同构」而不是「最省资源」，别让关键路径只在部署后第一次运行。
+- 本地遥测目标由 `ShortLink:TelemetryTarget` 二选一（`openobserve` 默认 / `aspire`），不要试图双写：OTel .NET SDK 一次只认一个端点，仪表盘 OTLP 还强制 `x-otlp-api-key`，该密钥由 DCP 只注入项目进程，容器里的 Collector 拿不到。切 `aspire` 时 AppHost 会把协议覆盖成 gRPC——DCP 默认注入的 `http/protobuf` 与仪表盘入口不匹配。
 - 改动 AppHost 的注入后必须冒烟：`/health/ready` 返回 `ready`、建链后访问短码拿到 302、回查 `clickCount` 增长，才算这条链路真的通。
 
 ## 发布端（compose / Helm）
