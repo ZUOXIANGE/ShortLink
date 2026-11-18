@@ -110,6 +110,8 @@ Api → Infrastructure → Application → Domain
 ## 本地编排（Aspire AppHost）
 
 - 一条命令起全套：`dotnet run --project src/ShortLink.AppHost` → 仪表盘 15000、API 5080、Web 5081，MySQL/Redis 由 Docker 拉起。决策与代价见 `docs/adr/0010-aspire-apphost-orchestration.md`。
+- **Aspire 17 起构建与运行 AppHost 都依赖 Aspire CLI bundle**（仪表盘与 DCP 不再随 `Aspire.Hosting.AppHost` 包分发，缺 bundle 直接报 ASPIRE009）。首次准备：`dotnet tool restore && dotnet aspire setup`；不能靠 `NoWarn` 绕过（ASPIRE013 不可抑制）。
+- AppHost 用普通 `Microsoft.NET.Sdk` + `Aspire.Hosting.AppHost` / `Aspire.Hosting.Dotnet` 包，.NET 项目资源走 `AddDotnetProject(name, path)`；`Aspire.AppHost.Sdk`、`Projects.*` 元数据与 `AddProject<T>` 均已废弃，不要再用。
 - **只有 `ShortLink.AppHost` 允许引用 `Aspire.Hosting.*`**。`Api` / `Infrastructure` / `Web` 禁止引 Aspire 客户端包与服务发现：应用侧只认 `IConfiguration`，否则同一份产物换到 compose / k8s 就跑不起来，线上故障也没法脱离 Aspire 复现。
 - AppHost 只做「资源 → 显式配置键」的翻译（`Database__Provider` / `Cache__RedisConnectionString` / `Messaging__Transport`），不做隐式注入。
 - **不引入 ServiceDefaults**：Api 自己已注册 OTel 三信号与 `/health`（含「存活探针不查依赖」的语义），再叠一层会重复上报并覆盖探针语义。仪表盘只通过 `OpenTelemetry__Endpoint` 接进去。
@@ -135,7 +137,7 @@ Api → Infrastructure → Application → Domain
 - **默认路径只跑 SQLite 宿主**（`ApiFactory`），目标是秒级反馈；PR 与本地随手跑的都是这一层。
 - **容器化用例由 `SHORTLINK_TEST_CONTAINERS=1` 门禁**（`ContainerTestGate`）。未开启时必须走 `Assert.Skip`，**不能静默通过**——静默通过等于永远不知道它没跑。
 - 容器 fixture 必须自己同时持有「容器 + 宿主」：xunit 的 collection fixture 之间不能互相注入，拆成两个 fixture 就没有「容器先于宿主」的顺序保证。宿主要主动触发一次 `Factory.Services`，让迁移在集合初始化阶段跑完。
-- 镜像版本与 AppHost / compose 产物保持一致（`mysql:8.4` / `redis:8.6`）；PostgreSQL 只用于测试（`postgres:17-alpine`，AppHost 不跑它）。只改一处等于让测试验的是另一个版本。
+- 镜像版本与 AppHost / compose 产物保持一致（`mysql:8.4` / `redis:8.10`）；PostgreSQL 只用于测试（`postgres:17-alpine`，AppHost 不跑它）。只改一处等于让测试验的是另一个版本。
 - 新增容器用例要**断言自己真的连到了目标形态**：MySQL 侧断言 `db.Database.IsMySql()`，PostgreSQL 侧断言 `db.Database.IsNpgsql()`，Redis 侧断言 `ICacheTopology.HasDistributedBackplane`。只看响应文案会被"配置看起来对、其实没连上"骗过。
 - 三个 provider 走同一串动作（登录 → 建链 → 跳转 → 读统计），共用 `SmokeApi`；新增 provider 时照抄一个 fixture + 一个冒烟类，**不要复制一份 HTTP 辅助代码**。
 - 别把限流额度抬到 1000 再断言「限流生效」：既有的 `ApiFactory` 抬额度是为了让业务用例不被 429 干扰，限流本身要用 `DistributedRateLimiterTests` 这类直接对 Redis 的用例验。
@@ -146,6 +148,7 @@ Api → Infrastructure → Application → Domain
 dotnet build ShortLink.slnx
 dotnet test ShortLink.slnx -c Debug
 dotnet tool restore && dotnet husky install    # 安装 Git 钩子（pre-commit 格式化暂存文件）
+dotnet tool restore && dotnet aspire setup     # 安装 Aspire CLI bundle（Aspire 17 起 AppHost 构建/运行必需）
 dotnet run --project src/ShortLink.AppHost  # 15000 仪表盘 / 5080 API / 5081 Web，含 MySQL + Redis
 dotnet aspire publish -o artifacts/compose # 产出 docker-compose.yaml + .env（需先 dotnet tool restore）
 dotnet run --project src/ShortLink.Api      # 5080

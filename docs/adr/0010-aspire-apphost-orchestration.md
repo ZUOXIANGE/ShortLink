@@ -95,6 +95,6 @@ dotnet run --project src/ShortLink.AppHost
 **代价**
 
 - 需要 Docker 在本机可用；CI 里跑 AppHost 会拉镜像，因此**测试仍然走 Testcontainers 与 SQLite**，不把 AppHost 引入测试链路。
-- AppHost 多一个 `Aspire.AppHost.Sdk` 版本要对齐（`NoWarn ASPIRE010` 是因为团队不用 `aspire run` CLI）。
+- AppHost 的编排依赖全部来自 Aspire CLI bundle：自 Aspire 17 起仪表盘与 DCP 不再随 `Aspire.Hosting.AppHost` 包分发，缺 bundle 构建直接失败（ASPIRE009），首次需 `dotnet aspire setup`。
 - 5080 / 5081 被占用时启动失败——这是刻意的：静默换端口只会把问题变成「前端登录不上」。
 - 数据落在 Docker 卷 `shortlink-mysql-data`，需要重置时 `docker volume rm shortlink-mysql-data`。

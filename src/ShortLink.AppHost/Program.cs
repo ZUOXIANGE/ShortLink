@@ -66,7 +66,7 @@ var apiPublicBaseUrl = isPublishMode
     ? builder.AddParameter("api-public-base-url")
     : builder.AddParameter("api-public-base-url", $"http://localhost:{apiPort}");
 
-var api = builder.AddProject<Projects.ShortLink_Api>("api")
+var api = builder.AddDotnetProject("api", "../ShortLink.Api/ShortLink.Api.csproj")
     .WithHttpEndpoint(port: apiPort, name: "http")
     // 跳转入口必须能从宿主机访问：短链形如 http://<domain>/abc123，暴露不出去等于平台不可用。
     .WithExternalHttpEndpoints()
@@ -228,7 +228,7 @@ else if (!isPublishMode && !string.IsNullOrWhiteSpace(builder.Configuration["ASP
 }
 
 // 管理后台：纯静态 WASM，只需等 API 起来（种子账号与默认域名由 API 启动时创建）。
-builder.AddProject<Projects.ShortLink_Web>("web")
+builder.AddDotnetProject("web", "../ShortLink.Web/ShortLink.Web.csproj")
     .WithHttpEndpoint(port: webPort, name: "http")
     .WithExternalHttpEndpoints()
     .WithEnvironment("API_BASE_URL", apiPublicBaseUrl)

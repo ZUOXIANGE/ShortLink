@@ -1,4 +1,4 @@
-<Project Sdk="Aspire.AppHost.Sdk/13.6.5">
+<Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
     <OutputType>Exe</OutputType>
@@ -7,12 +7,6 @@
     <IsPackable>false</IsPackable>
     <UserSecretsId>shortlink-apphost</UserSecretsId>
     <Description>Aspire 编排宿主：一条命令拉起 MySQL / Redis（按需 Kafka）、API 与管理后台。</Description>
-    <!--
-      ASPIRE010：Aspire CLI bundle 只在用 `aspire run` 时才需要。本项目走的是
-      `dotnet run` 直接启动 AppHost（团队机器上没必要为此装 CLI），
-      所以关掉 bundle 并静音这条提示，避免每次构建都刷一条与当前用法无关的警告。
-    -->
-    <NoWarn>$(NoWarn);ASPIRE010</NoWarn>
   </PropertyGroup>
 
   <!--
@@ -20,8 +14,14 @@
     应用项目（Api / Web / Infrastructure）刻意一个 Aspire 客户端包都不引，
     依赖注入只发生在进程外：AppHost 把资源翻译成环境变量，应用按普通 IConfiguration 读取。
     这样脱离 Aspire 也能用 appsettings / compose / k8s 起同一套东西。
+
+    Aspire 17 起 Aspire.AppHost.Sdk 已废弃（ASPIRE012）：普通 Microsoft.NET.Sdk 即可，
+    构建目标由 Aspire.Hosting.AppHost 提供，.NET 项目资源由 Aspire.Hosting.Dotnet 的
+    AddDotnetProject 注册，不再生成 Projects.* 元数据，因此也不再需要服务项目的 ProjectReference。
   -->
   <ItemGroup>
+    <PackageReference Include="Aspire.Hosting.AppHost" />
+    <PackageReference Include="Aspire.Hosting.Dotnet" />
     <PackageReference Include="Aspire.Hosting.MySql" />
     <PackageReference Include="Aspire.Hosting.Redis" />
     <PackageReference Include="Aspire.Hosting.Kafka" />
@@ -31,11 +31,6 @@
     <PackageReference Include="Aspire.Hosting.Kubernetes" />
     <PackageReference Include="Microsoft.Extensions.Logging.Abstractions" />
     <PackageReference Include="MySqlConnector" />
-  </ItemGroup>
-
-  <ItemGroup>
-    <ProjectReference Include="..\ShortLink.Api\ShortLink.Api.csproj" />
-    <ProjectReference Include="..\ShortLink.Web\ShortLink.Web.csproj" />
   </ItemGroup>
 
 </Project>

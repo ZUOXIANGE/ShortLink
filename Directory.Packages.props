@@ -110,21 +110,23 @@
   </ItemGroup>
   <ItemGroup Label="Aspire 编排（只允许 ShortLink.AppHost 引用）">
     <!--
-      AppHost SDK 走 <Project Sdk="Aspire.AppHost.Sdk/13.6.5">，编排核心包由 SDK 隐式引入，
-      这里只需显式声明资源集成包。三者必须与 SDK 同版本，否则 Aspire.Hosting 会出现版本打架。
-      13.6.5 于 2026-11-12 通过 nuget.org flat container API 核对为当前稳定版。
+      Aspire 17 起 AppHost 用普通 Microsoft.NET.Sdk：构建目标来自 Aspire.Hosting.AppHost，
+      .NET 项目资源来自 Aspire.Hosting.Dotnet（AddDotnetProject）。
+      全部编排包必须同版本，否则 Aspire.Hosting 会出现版本打架。
+      17.0.0 于 2026-11-18 通过 nuget.org flat container API 核对为当前稳定版。
     -->
-    <PackageVersion Include="Aspire.Hosting.MySql" Version="13.6.5" />
-    <PackageVersion Include="Aspire.Hosting.Redis" Version="13.6.5" />
-    <PackageVersion Include="Aspire.Hosting.Kafka" Version="13.6.5" />
-    <PackageVersion Include="Aspire.Hosting.RabbitMQ" Version="13.6.5" />
+    <PackageVersion Include="Aspire.Hosting.AppHost" Version="17.0.0" />
+    <PackageVersion Include="Aspire.Hosting.Dotnet" Version="17.0.0" />
+    <PackageVersion Include="Aspire.Hosting.MySql" Version="17.0.0" />
+    <PackageVersion Include="Aspire.Hosting.Redis" Version="17.0.0" />
+    <PackageVersion Include="Aspire.Hosting.Kafka" Version="17.0.0" />
+    <PackageVersion Include="Aspire.Hosting.RabbitMQ" Version="17.0.0" />
     <!--
       发布端（publish）：`aspire publish` 用它们把资源图落成 compose / Helm chart。
-      只有 Docker 有稳定版；Kubernetes 目前仍是 preview（13.6.5-preview.1.26559.7），
-      引入它属于「可预期的预览依赖」，升级时优先跟同一批 preview 版本。
+      自 17.0.0 起 Kubernetes 也发了稳定版，不再需要跟 preview 版本走。
     -->
-    <PackageVersion Include="Aspire.Hosting.Docker" Version="13.6.5" />
-    <PackageVersion Include="Aspire.Hosting.Kubernetes" Version="13.6.5-preview.1.26559.7" />
+    <PackageVersion Include="Aspire.Hosting.Docker" Version="17.0.0" />
+    <PackageVersion Include="Aspire.Hosting.Kubernetes" Version="17.0.0" />
   </ItemGroup>
   <ItemGroup Label="测试">
     <PackageVersion Include="Microsoft.NET.Test.Sdk" Version="18.11.1" />
@@ -136,7 +138,7 @@
     <!--
       Testcontainers（2026-11-12 通过 nuget.org flat container 核对为当前稳定版）。
       只用于「可选」的容器化集成测试：默认不跑，靠环境变量 SHORTLINK_TEST_CONTAINERS=1 开启，
-      保证 PR 路径仍是秒级的 SQLite 用例。镜像与 AppHost 保持一致（mysql:8.4 / redis:8.6）。
+      保证 PR 路径仍是秒级的 SQLite 用例。镜像与 AppHost 保持一致（mysql:8.4 / redis:8.10）。
     -->
     <PackageVersion Include="Testcontainers.MySql" Version="4.16.0" />
     <PackageVersion Include="Testcontainers.PostgreSql" Version="4.16.0" />

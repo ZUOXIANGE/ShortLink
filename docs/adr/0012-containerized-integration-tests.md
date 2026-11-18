@@ -66,6 +66,6 @@ Assert.True(topology.HasDistributedBackplane, "配了 Redis 就必须真的启�
 
 **代价**
 
-- 开启门禁后需要 Docker，且首次要拉三个镜像（`mysql:8.4` / `postgres:17-alpine` / `redis:8.6`），本机约 1 分钟。
+- 开启门禁后需要 Docker，且首次要拉三个镜像（`mysql:8.4` / `postgres:17-alpine` / `redis:8.10`），本机约 1 分钟。
 - 容器镜像版本现在有两处要对齐（AppHost 与测试 fixture）。刻意不抽成共享常量：测试项目不引用 AppHost（那是 `Exe` + Aspire SDK），抽常量的代价大于两行重复；改为在 AGENTS.md 里写明"改一处要改两处"。
 - 仍未覆盖：前端 WASM、Aspire 编排本身（需 `Aspire.Hosting.Testing`）。

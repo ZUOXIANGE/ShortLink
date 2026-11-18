@@ -36,7 +36,7 @@ var target = builder.Configuration["ShortLink:PublishTarget"]      // ShortLink_
              ?? "docker-compose";
 ```
 
-默认 compose。 Kubernetes 集成目前是 **preview** 包（`Aspire.Hosting.Kubernetes` 13.6.5-preview.1.26559.7），升级时跟同一批 preview 版本走。
+默认 compose。Kubernetes 集成自 `Aspire.Hosting.Kubernetes` 17.0.0 起已发稳定版，与其余编排包同版本升级，不再跟 preview 通道。
 
 ### 3. 发布阶段不写死任何密钥
 

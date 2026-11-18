@@ -209,7 +209,7 @@ public sealed class RedisHostFixture : IAsyncLifetime
             return;
         }
 
-        _container = new RedisBuilder("redis:8.6")
+        _container = new RedisBuilder("redis:8.10")
             .Build();
 
         await _container.StartAsync();

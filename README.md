@@ -66,6 +66,12 @@
 
 ### 一条命令（Aspire + Docker）
 
+首次使用先准备 Aspire CLI bundle（Aspire 17 起 AppHost 的构建与运行都依赖它）：
+
+```bash
+dotnet tool restore && dotnet aspire setup
+```
+
 ```bash
 dotnet run --project src/ShortLink.AppHost
 ```
