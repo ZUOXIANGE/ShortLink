@@ -1,11 +1,13 @@
 using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Caching.Memory;
 using Microsoft.Extensions.FileProviders;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
 using Microsoft.IdentityModel.JsonWebTokens;
 using ShortLink.Application.Abstractions;
+using ShortLink.Application.Abstractions.Persistence;
 using ShortLink.Application.Links;
 using ShortLink.Application.Users;
 using ShortLink.Application.Workspaces;
@@ -80,7 +82,10 @@ public sealed class TokenSecurityTests
         db.WorkspaceMembers.Add(member);
         await db.SaveChangesAsync(TestContext.Current.CancellationToken);
 
-        var validator = new TokenValidator(new UserRepository(db), new WorkspaceRepository(db));
+        var validator = new TokenValidator(
+            new UserRepository(db),
+            new WorkspaceRepository(db),
+            new MemoryCache(new MemoryCacheOptions()));
 
         // 升级前签发的令牌没有版本声明，API 按 0 传入；未改密的账号应继续可用。
         Assert.Equal(
@@ -105,6 +110,85 @@ public sealed class TokenSecurityTests
         db.WorkspaceMembers.Remove(member);
         await db.SaveChangesAsync(TestContext.Current.CancellationToken);
         Assert.Null(await validator.ValidateAsync(user.Id, workspace.Id, 2, TestContext.Current.CancellationToken));
+    }
+
+    [Fact]
+    public async Task Validator_Should_Cache_Membership_Role_Per_Token_Version()
+    {
+        await using var database = await SecuritySqliteDatabase.CreateAsync();
+        var db = database.Context;
+        var workspace = Workspace.Create("缓存", "cache", true, Now);
+        db.Workspaces.Add(workspace);
+        await db.SaveChangesAsync(TestContext.Current.CancellationToken);
+
+        var user = User.Create("cached", "缓存用户", "hash", UserRole.Member, Now);
+        db.Users.Add(user);
+        await db.SaveChangesAsync(TestContext.Current.CancellationToken);
+        db.WorkspaceMembers.Add(WorkspaceMember.Create(workspace.Id, user.Id, UserRole.Member, Now));
+        await db.SaveChangesAsync(TestContext.Current.CancellationToken);
+
+        var workspaces = new CountingWorkspaceRepository(new WorkspaceRepository(db));
+        var validator = new TokenValidator(
+            new UserRepository(db),
+            workspaces,
+            new MemoryCache(new MemoryCacheOptions()));
+
+        // 同一令牌版本的重复认证只应回源一次成员关系。
+        Assert.Equal(
+            UserRole.Member,
+            await validator.ValidateAsync(user.Id, workspace.Id, 0, TestContext.Current.CancellationToken));
+        Assert.Equal(
+            UserRole.Member,
+            await validator.ValidateAsync(user.Id, workspace.Id, 0, TestContext.Current.CancellationToken));
+        Assert.Equal(1, workspaces.MemberLookups);
+
+        // 版本变化（改密 / 改角色 / 停用后重新启用）后，新令牌必须重新取角色，不能命中旧键。
+        user.ChangeRole(UserRole.Member);
+        await db.SaveChangesAsync(TestContext.Current.CancellationToken);
+        Assert.Equal(
+            UserRole.Member,
+            await validator.ValidateAsync(user.Id, workspace.Id, 1, TestContext.Current.CancellationToken));
+        Assert.Equal(2, workspaces.MemberLookups);
+    }
+
+    private sealed class CountingWorkspaceRepository(IWorkspaceRepository inner) : IWorkspaceRepository
+    {
+        public int MemberLookups { get; private set; }
+
+        public Task<Workspace?> FindDefaultAsync(CancellationToken cancellationToken)
+            => inner.FindDefaultAsync(cancellationToken);
+
+        public Task<Workspace?> FindByIdAsync(long id, CancellationToken cancellationToken)
+            => inner.FindByIdAsync(id, cancellationToken);
+
+        public Task<WorkspaceMember?> FindMemberAsync(
+            long workspaceId,
+            long userId,
+            CancellationToken cancellationToken)
+        {
+            MemberLookups++;
+            return inner.FindMemberAsync(workspaceId, userId, cancellationToken);
+        }
+
+        public Task<IReadOnlyList<WorkspaceMember>> ListMembersAsync(
+            long workspaceId,
+            CancellationToken cancellationToken)
+            => inner.ListMembersAsync(workspaceId, cancellationToken);
+
+        public Task<IReadOnlyDictionary<long, WorkspaceMember>> ListMembersByUserIdsAsync(
+            long workspaceId,
+            IReadOnlyList<long> userIds,
+            CancellationToken cancellationToken)
+            => inner.ListMembersByUserIdsAsync(workspaceId, userIds, cancellationToken);
+
+        public Task<int> CountByRoleAsync(long workspaceId, UserRole role, CancellationToken cancellationToken)
+            => inner.CountByRoleAsync(workspaceId, role, cancellationToken);
+
+        public void AddWorkspace(Workspace workspace) => inner.AddWorkspace(workspace);
+
+        public void AddMember(WorkspaceMember member) => inner.AddMember(member);
+
+        public void RemoveMember(WorkspaceMember member) => inner.RemoveMember(member);
     }
 
     [Fact]

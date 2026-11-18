@@ -89,6 +89,9 @@ public static class InfrastructureServiceCollectionExtensions
 
         services.AddSingleton<IClock, SystemClock>();
 
+        // 认证等短周期读取的小缓存；与 FusionCache 的短链快照缓存相互独立。
+        services.AddMemoryCache();
+
         // 统计口径日历：写入（click_date）与读取（今日/趋势）共用一份换算，注册为单例——
         // TimeZoneInfo 是只读线程安全对象，构造一次即可，热路径上不再查时区表。
         services.AddSingleton<IStatisticsCalendar>(sp => new StatisticsCalendar(
