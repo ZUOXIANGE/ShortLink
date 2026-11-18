@@ -9,9 +9,15 @@ namespace ShortLink.Infrastructure.Analytics;
 /// <summary>单实例点击配额。每个短链的锁只保护一次内存计数，不访问数据库。</summary>
 public sealed class InMemoryClickQuota : IClickQuota
 {
+    // 闲置状态可以安全丢弃：下一次预留会用 CachedLink.ClickCount（数据库计数）重新初始化，
+    // 不会把已用量算少。定期清扫，避免「建了又删」的短链在进程内留下永久条目。
+    private const long StateSweepIntervalMs = 10 * 60 * 1000;
+    private const long IdleStateTtlMs = 24 * 60 * 60 * 1000;
+
     private readonly ConcurrentDictionary<long, QuotaState> _states = new();
     private readonly ConcurrentDictionary<Guid, long> _activeReservations = new();
     private readonly bool _multiInstanceEnvironment;
+    private long _lastSweepMs;
 
     public InMemoryClickQuota(ILogger<InMemoryClickQuota> logger)
     {
@@ -39,9 +45,11 @@ public sealed class InMemoryClickQuota : IClickQuota
         }
 
         cancellationToken.ThrowIfCancellationRequested();
+        SweepIdleStatesIfNeeded();
         var state = _states.GetOrAdd(link.Id, _ => new QuotaState());
         lock (state.Gate)
         {
+            state.LastTouchedMs = Environment.TickCount64;
             if (!state.Initialized)
             {
                 state.Used = Math.Max(link.ClickCount, 0);
@@ -54,6 +62,7 @@ public sealed class InMemoryClickQuota : IClickQuota
             }
 
             state.Used++;
+            state.ActiveReservations++;
             var reservation = ClickQuotaReservation.Create(link.Id, maxClicks);
             _activeReservations[reservation.ReservationId] = link.Id;
             return ValueTask.FromResult<ClickQuotaReservation?>(reservation);
@@ -76,7 +85,9 @@ public sealed class InMemoryClickQuota : IClickQuota
 
         lock (state.Gate)
         {
+            state.ActiveReservations = Math.Max(0, state.ActiveReservations - 1);
             state.Used = Math.Max(0, state.Used - 1);
+            state.LastTouchedMs = Environment.TickCount64;
         }
 
         return ValueTask.CompletedTask;
@@ -84,7 +95,16 @@ public sealed class InMemoryClickQuota : IClickQuota
 
     public ValueTask CompleteAsync(Guid reservationId, long linkId, CancellationToken cancellationToken = default)
     {
-        _activeReservations.TryRemove(reservationId, out _);
+        if (_activeReservations.TryRemove(reservationId, out _)
+            && _states.TryGetValue(linkId, out var state))
+        {
+            lock (state.Gate)
+            {
+                state.ActiveReservations = Math.Max(0, state.ActiveReservations - 1);
+                state.LastTouchedMs = Environment.TickCount64;
+            }
+        }
+
         return ValueTask.CompletedTask;
     }
 
@@ -95,9 +115,43 @@ public sealed class InMemoryClickQuota : IClickQuota
         {
             state.Used = Math.Max(state.Used, Math.Max(actualCount, 0));
             state.Initialized = true;
+            state.LastTouchedMs = Environment.TickCount64;
         }
 
         return ValueTask.CompletedTask;
+    }
+
+    /// <summary>
+    /// 丢弃长时间没有活动的链路状态。只清理没有在途预留的条目——
+    /// 在途预留在下一次清扫或重新预留时会与数据库计数重新对齐。
+    /// </summary>
+    private void SweepIdleStatesIfNeeded()
+    {
+        var now = Environment.TickCount64;
+        var last = Interlocked.Read(ref _lastSweepMs);
+        if (last != 0 && now - last < StateSweepIntervalMs)
+        {
+            return;
+        }
+
+        // 只有一个线程负责本轮清扫，避免所有请求同时遍历字典。
+        if (Interlocked.CompareExchange(ref _lastSweepMs, now, last) != last)
+        {
+            return;
+        }
+
+        foreach (var pair in _states)
+        {
+            var state = pair.Value;
+            lock (state.Gate)
+            {
+                if (state.ActiveReservations == 0 && now - state.LastTouchedMs >= IdleStateTtlMs)
+                {
+                    // 用 KeyValuePair 重载删除，避免把并发替换后的新状态误删。
+                    _states.TryRemove(pair);
+                }
+            }
+        }
     }
 
     private static bool IsMultiInstanceEnvironment()
@@ -113,31 +167,53 @@ public sealed class InMemoryClickQuota : IClickQuota
 
     private sealed class QuotaState
     {
+        public QuotaState()
+        {
+            LastTouchedMs = Environment.TickCount64;
+        }
+
         public object Gate { get; } = new();
 
         public long Used { get; set; }
 
         public bool Initialized { get; set; }
+
+        /// <summary>在途预留数；大于 0 时不能被清扫，否则重新初始化会把已用量算少。</summary>
+        public int ActiveReservations { get; set; }
+
+        public long LastTouchedMs { get; set; }
     }
 }
 
 /// <summary>基于 Redis Lua 的跨实例原子配额。Redis 异常时关闭带封顶短链的跳转，绝不退回本地计数。</summary>
 public sealed class RedisClickQuota(IConnectionMultiplexer redis, ILogger<RedisClickQuota> logger) : IClickQuota
 {
+    // 计数键和预留键都必须带过期时间，否则删除或长期闲置的短链会在 Redis 留下永久键。
+    // 计数键过期后，下一次预留用 CachedLink.ClickCount（已落库的计数）重新初始化，
+    // 不会把已用量算少，代价只是丢掉尚未落库的在途预留。
+    private const long CounterTtlMs = 7 * 24 * 60 * 60 * 1000;
+
+    private const long ReservationTtlMs = 7 * 24 * 60 * 60 * 1000;
+
     private const string ReserveScript = """
         if redis.call('EXISTS', KEYS[2]) == 1 then
             return -1
         end
-        local current = redis.call('GET', KEYS[1])
-        if not current or tonumber(ARGV[1]) > tonumber(current) then
-            current = ARGV[1]
-            redis.call('SET', KEYS[1], current)
+        local counter = redis.call('GET', KEYS[1])
+        local effective = counter
+        if not effective or tonumber(ARGV[1]) > tonumber(effective) then
+            effective = ARGV[1]
         end
-        if tonumber(current) >= tonumber(ARGV[2]) then
+        if tonumber(effective) >= tonumber(ARGV[2]) then
+            -- 已封顶也要刷新存活时间，避免「封顶后再无点击」的键永久留库。
+            if counter then
+                redis.call('PEXPIRE', KEYS[1], ARGV[3])
+            end
             return 0
         end
+        redis.call('SET', KEYS[1], effective, 'PX', ARGV[3])
         redis.call('INCR', KEYS[1])
-        redis.call('SET', KEYS[2], 'active', 'PX', 604800000)
+        redis.call('SET', KEYS[2], 'active', 'PX', ARGV[4])
         return 1
         """;
 
@@ -148,14 +224,15 @@ public sealed class RedisClickQuota(IConnectionMultiplexer redis, ILogger<RedisC
         local current = tonumber(redis.call('GET', KEYS[1]) or '0')
         if current > 0 then
             redis.call('DECR', KEYS[1])
+            redis.call('PEXPIRE', KEYS[1], ARGV[1])
         end
-        redis.call('SET', KEYS[2], 'released', 'PX', 604800000)
+        redis.call('SET', KEYS[2], 'released', 'PX', ARGV[2])
         return 1
         """;
 
     private const string CompleteScript = """
         if redis.call('GET', KEYS[2]) == 'active' then
-            redis.call('SET', KEYS[2], 'consumed', 'PX', 604800000)
+            redis.call('SET', KEYS[2], 'consumed', 'PX', ARGV[1])
         end
         return 1
         """;
@@ -164,7 +241,7 @@ public sealed class RedisClickQuota(IConnectionMultiplexer redis, ILogger<RedisC
         local current = tonumber(redis.call('GET', KEYS[1]) or '-1')
         local actual = tonumber(ARGV[1])
         if actual > current then
-            redis.call('SET', KEYS[1], actual)
+            redis.call('SET', KEYS[1], ARGV[1], 'PX', ARGV[2])
         end
         return 1
         """;
@@ -182,7 +259,7 @@ public sealed class RedisClickQuota(IConnectionMultiplexer redis, ILogger<RedisC
             var result = await redis.GetDatabase().ScriptEvaluateAsync(
                     ReserveScript,
                     [Key(link.Id), ReservationKey(reservation.ReservationId)],
-                    [Math.Max(link.ClickCount, 0), maxClicks])
+                    [Math.Max(link.ClickCount, 0), maxClicks, CounterTtlMs, ReservationTtlMs])
                 .WaitAsync(cancellationToken)
                 .ConfigureAwait(false);
 
@@ -212,7 +289,7 @@ public sealed class RedisClickQuota(IConnectionMultiplexer redis, ILogger<RedisC
             await redis.GetDatabase().ScriptEvaluateAsync(
                     ReleaseScript,
                     [Key(linkId), ReservationKey(reservationId)],
-                    [])
+                    [CounterTtlMs, ReservationTtlMs])
                 .WaitAsync(cancellationToken)
                 .ConfigureAwait(false);
         }
@@ -231,7 +308,7 @@ public sealed class RedisClickQuota(IConnectionMultiplexer redis, ILogger<RedisC
             await redis.GetDatabase().ScriptEvaluateAsync(
                     CompleteScript,
                     [Key(linkId), ReservationKey(reservationId)],
-                    [])
+                    [ReservationTtlMs])
                 .WaitAsync(cancellationToken)
                 .ConfigureAwait(false);
         }
@@ -250,7 +327,7 @@ public sealed class RedisClickQuota(IConnectionMultiplexer redis, ILogger<RedisC
             await redis.GetDatabase().ScriptEvaluateAsync(
                     SynchronizeScript,
                     [Key(linkId)],
-                    [Math.Max(actualCount, 0)])
+                    [Math.Max(actualCount, 0), CounterTtlMs])
                 .WaitAsync(cancellationToken)
                 .ConfigureAwait(false);
         }
