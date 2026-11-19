@@ -10,6 +10,8 @@
             <MudTextField @bind-Value="_host"
                           Label="域名"
                           Placeholder="s.example.com"
+                          Required="@(!IsEdit)"
+                          RequiredError="请填写域名"
                           HelperText="@(IsEdit ? "域名创建后不可修改，避免已分发短链失效" : "只填主机名，可带端口，例如 localhost:5080")"
                           Variant="Variant.Outlined"
                           Margin="Margin.Dense"

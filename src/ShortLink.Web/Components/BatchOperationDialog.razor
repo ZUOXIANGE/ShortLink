@@ -9,7 +9,8 @@
         <MudStack Spacing="3" Class="mt-2">
             @if (Action == BatchActions.ChangeDomain)
             {
-                <MudSelect T="long?" @bind-Value="_domainId" Label="目标域名" Variant="Variant.Outlined" Margin="Margin.Dense">
+                <MudSelect T="long?" @bind-Value="_domainId" Label="目标域名" Variant="Variant.Outlined" Margin="Margin.Dense"
+                           Required="true" RequiredError="请选择目标域名">
                     @foreach (var domain in Domains)
                     {
                         <MudSelectItem T="long?" Value="@(domain.Id)">

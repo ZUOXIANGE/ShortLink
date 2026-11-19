@@ -9,6 +9,7 @@
     <DialogContent>
         <MudStack Spacing="3" Class="mt-2">
             <MudTextField @bind-Value="_userName" Label="登录名" Variant="Variant.Outlined"
+                          Required="@(!IsEdit)" RequiredError="请填写登录名"
                           Margin="Margin.Dense" Disabled="@IsEdit" Immediate="true" />
 
             <MudTextField @bind-Value="_displayName" Label="显示名" Variant="Variant.Outlined"
@@ -17,6 +18,7 @@
             @if (!IsEdit)
             {
                 <MudTextField @bind-Value="_password" Label="初始密码" Variant="Variant.Outlined"
+                              Required="true" RequiredError="请设置初始密码"
                               Margin="Margin.Dense" InputType="InputType.Password"
                               HelperText="至少 8 位，创建后可通过重置密码修改" />
             }

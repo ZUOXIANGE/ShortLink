@@ -13,6 +13,8 @@
     <MudStack Spacing="4" Class="mt-6">
         <MudTextField @bind-Value="_userName"
                       Label="用户名"
+                      Required="true"
+                      RequiredError="请输入用户名"
                       Variant="Variant.Outlined"
                       Margin="Margin.Dense"
                       AutoFocus="true"
@@ -20,6 +22,8 @@
 
         <MudTextField @bind-Value="_password"
                       Label="密码"
+                      Required="true"
+                      RequiredError="请输入密码"
                       InputType="InputType.Password"
                       Variant="Variant.Outlined"
                       Margin="Margin.Dense"

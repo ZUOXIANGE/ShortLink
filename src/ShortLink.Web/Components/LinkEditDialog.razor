@@ -10,6 +10,8 @@
             <MudTextField @bind-Value="_targetUrl"
                           Label="目标地址"
                           Placeholder="https://example.com/landing"
+                          Required="true"
+                          RequiredError="请填写目标地址"
                           Variant="Variant.Outlined"
                           Margin="Margin.Dense"
                           Immediate="true" />
@@ -19,6 +21,8 @@
                     <MudSelect T="long?"
                                @bind-Value="_domainId"
                                Label="短链域名"
+                               Required="true"
+                               RequiredError="请选择短链域名"
                                Variant="Variant.Outlined"
                                Margin="Margin.Dense"
                                Disabled="@IsEdit">

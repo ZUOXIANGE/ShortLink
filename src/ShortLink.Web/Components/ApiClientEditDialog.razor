@@ -8,11 +8,13 @@
     <DialogContent>
         <MudStack Spacing="3" Class="mt-2">
             <MudTextField @bind-Value="_name" Label="凭据名称" Variant="Variant.Outlined"
+                          Required="true" RequiredError="请填写凭据名称"
                           Margin="Margin.Dense" Immediate="true"
                           HelperText="用于在列表中辨识，例如「订单系统」" />
 
             <MudSelect T="long" Value="_userId" ValueChanged="OnUserChanged"
                        Label="绑定工作区账号" Variant="Variant.Outlined" Margin="Margin.Dense"
+                       Required="true" RequiredError="请选择绑定的工作区账号"
                        Disabled="@IsEdit">
                 @foreach (var user in Users)
                 {
@@ -41,7 +43,7 @@
                 实际权限取「账号当前角色」与「角色上限」的较低者；scope 与角色是 AND 关系。
             </MudText>
 
-            <MudText Typo="Typo.subtitle2">权限范围</MudText>
+            <MudText Typo="Typo.subtitle2">权限范围（必填，至少选一项）</MudText>
             <MudStack Spacing="0">
                 @foreach (var scope in ApiScopes.All)
                 {
