@@ -6,7 +6,7 @@
     <AssemblyName>ShortLink.AppHost</AssemblyName>
     <IsPackable>false</IsPackable>
     <UserSecretsId>shortlink-apphost</UserSecretsId>
-    <Description>Aspire 编排宿主：一条命令拉起 MySQL / Redis（按需 Kafka）、API 与管理后台。</Description>
+    <Description>Aspire 编排宿主：一条命令拉起 PostgreSQL / Redis / RabbitMQ（按需 MySQL / Kafka）、API 与管理后台。</Description>
   </PropertyGroup>
 
   <!--
@@ -23,6 +23,7 @@
     <PackageReference Include="Aspire.Hosting.AppHost" />
     <PackageReference Include="Aspire.Hosting.Dotnet" />
     <PackageReference Include="Aspire.Hosting.MySql" />
+    <PackageReference Include="Aspire.Hosting.PostgreSQL" />
     <PackageReference Include="Aspire.Hosting.Redis" />
     <PackageReference Include="Aspire.Hosting.Kafka" />
     <PackageReference Include="Aspire.Hosting.RabbitMQ" />

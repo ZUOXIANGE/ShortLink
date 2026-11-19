@@ -12,10 +12,10 @@
 | 维度 | 选型 |
 | --- | --- |
 | 后端 | .NET 10 · ASP.NET Core Minimal API · EF Core 10 |
-| 数据库 | MySQL 8（生产）· SQLite（零依赖启动）· PostgreSQL |
+| 数据库 | PostgreSQL 17（推荐）· MySQL 8 · SQLite（零依赖启动） |
 | 前端 | Blazor WebAssembly · MudBlazor 9 |
 | 缓存 | FusionCache（防击穿 + fail-safe，可选 Redis 背板） |
-| 消息 | Wolverine（进程内批处理，可切换 Kafka） |
+| 消息 | Wolverine（进程内批处理，可切换 RabbitMQ / Kafka） |
 | 认证 | JWT（HS256）+ PBKDF2-SHA256，角色 `owner` / `admin` / `member` / `viewer` |
 | 可观测性 | OpenTelemetry traces / metrics / logs + Serilog |
 
@@ -89,7 +89,8 @@ dotnet run --project src/ShortLink.AppHost
 | --- | --- | --- | --- |
 | 管理后台 / API | `admin` | `Admin@123456` | AppHost 的 `seed-admin-password` 参数（`Seed__AdminPassword`） |
 | OpenObserve（组织 `default`） | `root@shortlink.local` | `Observe@123456` | AppHost 的 `ZO_ROOT_USER_EMAIL` / `ZO_ROOT_USER_PASSWORD` |
-| MySQL（容器） | `root` | `ChangeMe_123!` | AppHost 的 `mysql-password` 参数 |
+| PostgreSQL（容器） | `postgres` | `ChangeMe_123!` | AppHost 的 `postgres-password` 参数 |
+| RabbitMQ（容器） | `shortlink` | `Rabbit123456` | AppHost 的 `rabbitmq-username` / `rabbitmq-password` 参数 |
 
 OpenObserve 的 OTLP 入口是 `http://<host>:<port>/api/default`、HTTP Basic 认证；AppHost 会自动把端点、协议与 `Authorization` 头注入 API，无需手工配置。
 
@@ -101,10 +102,10 @@ dotnet run --project src/ShortLink.AppHost -- --ShortLink:TelemetryTarget=aspire
 
 不切时默认发 OpenObserve；切到 `aspire` 后 `openobserve` 容器不会启动，traces/metrics/logs 直接进仪表盘。
 
-默认用 Docker 拉起 MySQL 8.4 与 Redis，按依赖顺序启动 API 与 Web。零容器模式：
+默认用 Docker 拉起 PostgreSQL 17、Redis 与 RabbitMQ，按依赖顺序启动 API 与 Web。需要 MySQL 时改用 `--ShortLink:Database=mysql`；只想要进程内消息（不拉 RabbitMQ）时加 `--ShortLink:UseRabbitMq=false`。零容器模式：
 
 ```bash
-dotnet run --project src/ShortLink.AppHost -- --ShortLink:Database=sqlite --ShortLink:UseRedis=false
+dotnet run --project src/ShortLink.AppHost -- --ShortLink:Database=sqlite --ShortLink:UseRedis=false --ShortLink:UseRabbitMq=false
 ```
 
 ### 本地零依赖（SQLite）
@@ -117,7 +118,20 @@ dotnet run --project src/ShortLink.Web    # http://localhost:5081
 
 首次启动自动执行迁移，并创建管理员 `admin / Admin@123456`（来源 `Seed:AdminPassword`，**登录后立即修改**）与默认域名 `localhost:5080`。
 
-### 生产配置（MySQL）
+### 生产配置（PostgreSQL，推荐）
+
+PostgreSQL 是本项目的**首选数据库**：本地编排、容器化集成测试与发布模板都以它为基线，新部署建议直接用 PG。启动迁移时使用的是 `ShortLink.Infrastructure.Migrations.PostgreSql`，无需手工 `database update`。
+
+```jsonc
+"Database": {
+  "Provider": "PostgreSql",
+  "ConnectionString": "Host=127.0.0.1;Port=5432;Database=shortlink;Username=shortlink;Password=***"
+}
+```
+
+### 生产配置（MySQL，兼容）
+
+MySQL 8 仍是一等支持（`Microting.EntityFrameworkCore.MySql` 驱动），切换只改 Provider 与连接串：
 
 ```jsonc
 "Database": {
@@ -127,7 +141,7 @@ dotnet run --project src/ShortLink.Web    # http://localhost:5081
 }
 ```
 
-常用环境变量：`Jwt__SigningKey`（≥32 字节）、`Seed__AdminPassword`、`Cache__RedisConnectionString`、`OpenTelemetry__Endpoint`、`OpenTelemetry__Headers`。API 启动时自动迁移，无需手工 `database update`。
+常用环境变量：`Jwt__SigningKey`（≥32 字节）、`Seed__AdminPassword`、`Cache__RedisConnectionString`、`Messaging__Transport`（`local` / `rabbitmq` / `kafka`）、`Messaging__RabbitMq__ConnectionString`、`OpenTelemetry__Endpoint`、`OpenTelemetry__Headers`。API 启动时自动迁移，无需手工 `database update`。
 
 接 OpenObserve 时：`OTEL_EXPORTER_OTLP_ENDPOINT=http://<host>:<port>/api/<org>`、`OTEL_EXPORTER_OTLP_PROTOCOL=http/protobuf`、`OTEL_EXPORTER_OTLP_HEADERS=Authorization=Basic%20<base64(email:password)>`（环境变量形态下空格要写成 `%20`；走 `OpenTelemetry__Headers` 配置时用普通空格）。
 

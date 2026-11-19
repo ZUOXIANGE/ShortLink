@@ -17,7 +17,7 @@
 **三个硬性约束**（贯穿全部设计）：
 
 1. **前后端完全分离**。后端只暴露统一信封的 HTTP API，前端是纯 WASM SPA，通过 Bearer Token 调用，不使用 Cookie，不共享服务端会话。
-2. **数据库可切换**。默认 SQLite 可零依赖启动，生产用 MySQL 8（`Microting.EntityFrameworkCore.MySql`），同时支持 PostgreSQL。
+2. **数据库可切换**。默认 SQLite 可零依赖启动，生产推荐 PostgreSQL 17，同时支持 MySQL 8（`Microting.EntityFrameworkCore.MySql`）。
 3. **跳转路径不碰数据库**。一次跳转 = 一次缓存读取 + 一次消息发布，这是整套架构的性能基线。
 
 ### 1.1 质量目标

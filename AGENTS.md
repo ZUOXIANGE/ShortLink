@@ -109,14 +109,14 @@ Api → Infrastructure → Application → Domain
 
 ## 本地编排（Aspire AppHost）
 
-- 一条命令起全套：`dotnet run --project src/ShortLink.AppHost` → 仪表盘 15000、API 5080、Web 5081，MySQL/Redis 由 Docker 拉起。决策与代价见 `docs/adr/0010-aspire-apphost-orchestration.md`。
+- 一条命令起全套：`dotnet run --project src/ShortLink.AppHost` → 仪表盘 15000、API 5080、Web 5081，PostgreSQL/Redis/RabbitMQ 由 Docker 拉起（`ShortLink:Database=mysql`、`ShortLink:UseRabbitMq=false` 可切换）。决策与代价见 `docs/adr/0010-aspire-apphost-orchestration.md`。
 - **Aspire 17 起构建与运行 AppHost 都依赖 Aspire CLI bundle**（仪表盘与 DCP 不再随 `Aspire.Hosting.AppHost` 包分发，缺 bundle 直接报 ASPIRE009）。首次准备：`dotnet tool restore && dotnet aspire setup`；不能靠 `NoWarn` 绕过（ASPIRE013 不可抑制）。
 - AppHost 用普通 `Microsoft.NET.Sdk` + `Aspire.Hosting.AppHost` / `Aspire.Hosting.Dotnet` 包，.NET 项目资源走 `AddDotnetProject(name, path)`；`Aspire.AppHost.Sdk`、`Projects.*` 元数据与 `AddProject<T>` 均已废弃，不要再用。
 - **只有 `ShortLink.AppHost` 允许引用 `Aspire.Hosting.*`**。`Api` / `Infrastructure` / `Web` 禁止引 Aspire 客户端包与服务发现：应用侧只认 `IConfiguration`，否则同一份产物换到 compose / k8s 就跑不起来，线上故障也没法脱离 Aspire 复现。
 - AppHost 只做「资源 → 显式配置键」的翻译（`Database__Provider` / `Cache__RedisConnectionString` / `Messaging__Transport`），不做隐式注入。
 - **不引入 ServiceDefaults**：Api 自己已注册 OTel 三信号与 `/health`（含「存活探针不查依赖」的语义），再叠一层会重复上报并覆盖探针语义。仪表盘只通过 `OpenTelemetry__Endpoint` 接进去。
 - 对外端口固定 5080 / 5081（WASM 的 `ApiBaseUrl` 与 `Cors:AllowedOrigins` 是浏览器读的静态配置，随机端口会表现成「登录不上」）；**依赖容器与 Aspire 自身内部端口一律留空自动分配**，别写死——本机随便一个安全客户端就可能占掉你固定的端口。
-- 连接串不要图省事直接吃 `AddMySql` 生成的：项目依赖 `AllowUserVariables` / `UseAffectedRows` / `CharSet=utf8mb4`。Redis 反过来必须用资源自带的 `ConnectionStringExpression`：容器默认 `requirepass` 且口令随机，自己拼 `host:port` 的症状是只有 `/health/ready` 的 cache 一直 fail。
+- 连接串不要图省事直接吃 `AddPostgres` / `AddMySql` 生成的：MySQL 分支依赖 `AllowUserVariables` / `UseAffectedRows` / `CharSet=utf8mb4`。Redis 反过来必须用资源自带的 `ConnectionStringExpression`：容器默认 `requirepass` 且口令随机，自己拼 `host:port` 的症状是只有 `/health/ready` 的 cache 一直 fail。
 - 新增依赖（Kafka、PostgreSQL…）用 AppHost 配置开关暴露，默认值取「与生产同构」而不是「最省资源」，别让关键路径只在部署后第一次运行。
 - 本地遥测目标由 `ShortLink:TelemetryTarget` 二选一（`openobserve` 默认 / `aspire`），不要试图双写：OTel .NET SDK 一次只认一个端点，仪表盘 OTLP 还强制 `x-otlp-api-key`，该密钥由 DCP 只注入项目进程，容器里的 Collector 拿不到。切 `aspire` 时 AppHost 会把协议覆盖成 gRPC——DCP 默认注入的 `http/protobuf` 与仪表盘入口不匹配。
 - 改动 AppHost 的注入后必须冒烟：`/health/ready` 返回 `ready`、建链后访问短码拿到 302、回查 `clickCount` 增长，才算这条链路真的通。
@@ -131,7 +131,7 @@ Api → Infrastructure → Application → Domain
 - `publish` 只出文件不建镜像（`API_IMAGE` 为空是正常的），要镜像就再跑 `aspire do prepare-<env>` 或 `aspire deploy`。
 - 发布模式下**任何密钥都不给默认值**：新增凭据类参数时用 `isPublishMode ? AddParameter(name, secret: true) : AddParameter(name, secret: true, value: 开发值)`，让产物里留下占位符。往 compose/Helm 里写 dev 口令是最容易被复制到生产的事故。
 - 新增需要发布的服务：确认它是「容器可跑」的形态。Blazor WASM 这类静态站必须给 Dockerfile（见 `src/ShortLink.Web/Dockerfile`），别让 DevServer 混进生产镜像。
-- 部署侧事实要显式写进产物：MySQL 健康检查与 `depends_on: service_healthy`、端口映射去重、仪表盘默认关闭，都在 `ConfigureComposeFile` 里做。
+- 部署侧事实要显式写进产物：数据库（PostgreSQL / MySQL）健康检查与 `depends_on: service_healthy`、端口映射去重、仪表盘默认关闭，都在 `ConfigureComposeFile` 里做。
 
 ## 测试分层
 
@@ -150,7 +150,7 @@ dotnet build ShortLink.slnx
 dotnet test ShortLink.slnx -c Debug
 dotnet tool restore && dotnet husky install    # 安装 Git 钩子（pre-commit 格式化暂存文件）
 dotnet tool restore && dotnet aspire setup     # 安装 Aspire CLI bundle（Aspire 17 起 AppHost 构建/运行必需）
-dotnet run --project src/ShortLink.AppHost  # 15000 仪表盘 / 5080 API / 5081 Web，含 MySQL + Redis
+dotnet run --project src/ShortLink.AppHost  # 15000 仪表盘 / 5080 API / 5081 Web，含 PostgreSQL + Redis + RabbitMQ
 dotnet aspire publish -o artifacts/compose # 产出 docker-compose.yaml + .env（需先 dotnet tool restore）
 dotnet run --project src/ShortLink.Api      # 5080
 dotnet run --project src/ShortLink.Web      # 5081

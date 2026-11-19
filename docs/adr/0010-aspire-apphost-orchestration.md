@@ -24,7 +24,7 @@
 AppHost 只做一件事：把资源（容器、项目）翻译成**显式的配置键**。
 
 ```csharp
-api.WithEnvironment("Database__Provider", "MySql")
+api.WithEnvironment("Database__Provider", "PostgreSql")
    .WithEnvironment("Database__ConnectionString", connectionString)
    .WithEnvironment("Cache__RedisConnectionString", redis.Resource.ConnectionStringExpression);
 ```
@@ -50,19 +50,21 @@ api.WithEnvironment("OpenTelemetry__Endpoint", builder.Configuration["ASPIRE_DAS
 - **为什么写死**：管理后台是 Blazor WASM，`ApiBaseUrl` 是烧在 `wwwroot/appsettings.json` 里、由浏览器读取的静态配置，**读不到环境变量**。端口一随机，`Cors:AllowedOrigins` 与 `Seed:DefaultDomainHost` 会同时失配，症状是「登录页点了没反应」——很难联想到是端口问题。写死 5080/5081 后，现有 appsettings 一个字都不用改。
 - **为什么容器端口随机**：宿主机上可能已经装了 MySQL / Redis。开发机上实测就撞上过第三方进程占用 ASPIRE 默认要用的 20000 端口，因此连 AppHost 自己的 resource service 端口也不固定，交给 Aspire 动态分配。
 
-### 4. 默认 MySQL + Redis，Kafka 与 SQLite 走开关
+### 4. 默认 PostgreSQL + Redis + RabbitMQ，MySQL / Kafka / SQLite 走开关
 
 | 开关 | 默认 | 说明 |
 | --- | --- | --- |
-| `ShortLink:Database` | `mysql` | `sqlite` 时不拉容器，退回零依赖路径（快速验证前端/接口用） |
+| `ShortLink:Database` | `postgresql` | `mysql` 切换数据库；`sqlite` 时不拉容器，退回零依赖路径（快速验证前端/接口用） |
+| `ShortLink:PostgreSqlImageTag` | `17` | PostgreSQL 容器镜像标签 |
 | `ShortLink:MySqlImageTag` / `ShortLink:MySqlVersion` | `8.4` / `8.4.0` | 必须成对维护：`ServerVersion` 决定 EF 方言分支 |
 | `ShortLink:UseRedis` | `true` | 关掉即退回进程内缓存与本地限流窗口 |
-| `ShortLink:UseKafka` | `false` | 打开会额外拉 Kafka 容器，并把 `Messaging:Transport` 切成 `kafka` |
+| `ShortLink:UseRabbitMq` | `true` | 拉 RabbitMQ 容器，并把 `Messaging:Transport` 切成 `rabbitmq` |
+| `ShortLink:UseKafka` | `false` | 打开会额外拉 Kafka 容器，并把 `Messaging:Transport` 切成 `kafka`（与 `UseRabbitMq` 互斥） |
 | `ShortLink:TelemetryTarget` | `openobserve` | 遥测目标二选一：`openobserve`（容器里看）或 `aspire`（仪表盘里看）；OTel SDK 单端点，不做双写 |
 
-默认值刻意选「与生产同构」而不是「最省资源」：本地跑不到 MySQL 迁移与 Redis Lua 限流，等于把这两块的风险全部推到部署后。
+默认值刻意选「与生产同构」而不是「最省资源」：本地跑不到 PostgreSQL / MySQL 迁移与 Redis Lua 限流，等于把这几块的风险全部推到部署后。
 
-### 5. MySQL 连接串自己拼，不用 `AddMySql` 生成的
+### 5. 数据库连接串自己拼，不用 `AddPostgres` / `AddMySql` 生成的
 
 项目依赖 `AllowUserVariables` / `UseAffectedRows` / `CharSet=utf8mb4`（批量更新与中文行为）。连接串按既有格式显式拼装，从容器端点取 host/port、从参数资源取口令：
 
@@ -83,14 +85,14 @@ dotnet run --project src/ShortLink.AppHost
 - API <http://localhost:5080/health>、<http://localhost:5080/health/ready>
 - 管理后台 <http://localhost:5081>
 
-冒烟路径（已实测通过）：登录 `admin` → 建短链 → 访问短码拿 302 → 回查 `clickCount=1`（证明 MySQL 迁移、种子、Redis 缓存、消息批落库整条链路都在跑）。
+冒烟路径（已实测通过）：登录 `admin` → 建短链 → 访问短码拿 302 → 回查 `clickCount=1`（证明数据库迁移、种子、Redis 缓存、消息批落库整条链路都在跑）。
 
 ## 后果
 
 **收益**
 
-- 一条命令替代「装库 + 装缓存 + 两个终端」；MySQL 迁移与 Redis 路径回到日常开发视野内。
-- 依赖版本（MySQL 8.4 / Redis）由代码固定，团队环境一致。
+- 一条命令替代「装库 + 装缓存 + 两个终端」；数据库迁移与 Redis 路径回到日常开发视野内。
+- 依赖版本（PostgreSQL 17 / MySQL 8.4 / Redis）由代码固定，团队环境一致。
 - 仪表盘直接看到 traces / metrics / logs 与资源状态，排障不必先找日志文件。
 
 **代价**
@@ -98,4 +100,4 @@ dotnet run --project src/ShortLink.AppHost
 - 需要 Docker 在本机可用；CI 里跑 AppHost 会拉镜像，因此**测试仍然走 Testcontainers 与 SQLite**，不把 AppHost 引入测试链路。
 - AppHost 的编排依赖全部来自 Aspire CLI bundle：自 Aspire 17 起仪表盘与 DCP 不再随 `Aspire.Hosting.AppHost` 包分发，缺 bundle 构建直接失败（ASPIRE009），首次需 `dotnet aspire setup`。
 - 5080 / 5081 被占用时启动失败——这是刻意的：静默换端口只会把问题变成「前端登录不上」。
-- 数据落在 Docker 卷 `shortlink-mysql-data`，需要重置时 `docker volume rm shortlink-mysql-data`。
+- 数据落在 Docker 卷 `shortlink-postgres-data`（MySQL 为 `shortlink-mysql-data`），需要重置时 `docker volume rm <卷名>`。

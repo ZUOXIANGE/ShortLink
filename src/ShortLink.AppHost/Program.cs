@@ -16,7 +16,8 @@ using Microsoft.Extensions.Configuration;
 // 2. API 与 Web 的对外端口写死（5080 / 5081）。
 //    管理后台是 Blazor WASM，容器启动时由 entrypoint 把 API_BASE_URL 写入运行时配置；
 //    CORS 白名单与短链默认域名也由下方公网参数显式注入，避免浏览器误连 localhost。
-//    依赖容器（MySQL / Redis / Kafka）则用随机端口，避免和本机已装的服务抢 3306 / 6379。
+//    依赖容器（PostgreSQL / MySQL / Redis / RabbitMQ / Kafka）则用随机端口，
+//    避免和本机已装的服务抢 5432 / 3306 / 6379 / 5672。
 //
 // 3. 不引入 ServiceDefaults 项目。
 //    Api 自己已经注册了 OpenTelemetry 三信号与 /health（含 /health/ready 的真实语义），
@@ -30,6 +31,7 @@ var builder = DistributedApplication.CreateBuilder(args);
 const int apiPort = 5080;
 const int webPort = 5081;
 
+const string postgresDevPassword = "ChangeMe_123!";
 const string mySqlDevPassword = "ChangeMe_123!";
 
 // OpenObserve 仅用于本地编排（发布产物不带它），root 账号也相当于本地开发凭据。
@@ -42,11 +44,19 @@ var isPublishMode = builder.ExecutionContext.IsPublishMode;
 
 // 开关都走 configuration：appsettings.json 给默认值，命令行可覆盖，
 // 例如 `dotnet run --project src/ShortLink.AppHost --ShortLink:Database=sqlite`。
-var useMySql = !string.Equals(
-    builder.Configuration["ShortLink:Database"], "sqlite", StringComparison.OrdinalIgnoreCase);
+// 数据库默认 PostgreSQL；ShortLink:Database 可选 postgresql / mysql / sqlite。
+var databaseProvider = (builder.Configuration["ShortLink:Database"] ?? "postgresql").Trim().ToLowerInvariant();
+var usePostgres = databaseProvider is "postgresql" or "postgres" or "pgsql";
+var useMySql = databaseProvider == "mysql";
+if (!usePostgres && !useMySql && databaseProvider != "sqlite")
+{
+    // 写错 provider 时直接起不来：静默回落成 MySQL 会让「配了 PG 却连错库」排查很久。
+    throw new InvalidOperationException(
+        $"ShortLink:Database 只能是 postgresql / mysql / sqlite，当前为 '{databaseProvider}'。");
+}
 var useRedis = ReadBool(builder.Configuration, "ShortLink:UseRedis", fallback: true);
 var useKafka = ReadBool(builder.Configuration, "ShortLink:UseKafka", fallback: false);
-var useRabbitMq = ReadBool(builder.Configuration, "ShortLink:UseRabbitMq", fallback: false);
+var useRabbitMq = ReadBool(builder.Configuration, "ShortLink:UseRabbitMq", fallback: true);
 if (useKafka && useRabbitMq)
 {
     // 消息只有一个传输方向：两个开关同时打开说明配置写错了，直接起不来比猜一个更省事。
@@ -55,6 +65,7 @@ if (useKafka && useRabbitMq)
 }
 // 本地遥测目标二选一（OTel SDK 单端点）：openobserve（默认，容器里看）| aspire（仪表盘里看）。
 var telemetryTarget = ReadTelemetryTarget(builder.Configuration);
+var postgresImageTag = builder.Configuration["ShortLink:PostgreSqlImageTag"] ?? "17";
 var mySqlImageTag = builder.Configuration["ShortLink:MySqlImageTag"] ?? "8.4";
 var mySqlServerVersion = builder.Configuration["ShortLink:MySqlVersion"] ?? "8.4.0";
 var openObserveImageTag = builder.Configuration["ShortLink:OpenObserveImageTag"] ?? "v1.1.2";
@@ -108,7 +119,32 @@ var defaultDomainScheme = isPublishMode
 api.WithEnvironment("Seed__DefaultDomainHost", defaultDomainHost)
     .WithEnvironment("Seed__DefaultDomainScheme", defaultDomainScheme);
 
-if (useMySql)
+if (usePostgres)
+{
+    // 口令只用于本地开发容器，生产走 Secret；不要往这里抄线上口令。
+    // publish 时刻意不给默认值：生成的 .env / Helm values 里留空，由运维填。
+    var postgresPassword = isPublishMode
+        ? builder.AddParameter("postgres-password", secret: true)
+        : builder.AddParameter("postgres-password", postgresDevPassword, secret: true);
+
+    var postgres = builder.AddPostgres("postgres", password: postgresPassword)
+        .WithImageTag(postgresImageTag)
+        // compose 部署没有 DCP 的生命周期建库步骤，官方镜像只在首次初始化时按 POSTGRES_DB 建库。
+        .WithEnvironment("POSTGRES_DB", "shortlink")
+        .WithDataVolume("shortlink-postgres-data");
+
+    // 连接串显式拼装（与 MySQL 分支同口径）：应用进程跑在宿主机上，
+    // 只能走映射出来的 host:port，不能用容器服务名。
+    var endpoint = postgres.GetEndpoint("tcp");
+    var connectionString = ReferenceExpression.Create(
+        $"Host={endpoint.Property(EndpointProperty.Host)};Port={endpoint.Property(EndpointProperty.Port)};Database=shortlink;Username=postgres;Password={postgresPassword.Resource}");
+
+    // 资源名不能叫 shortlink：发布模式下的 compose environment 也叫 shortlink，重名会直接起不来。
+    api.WaitFor(postgres.AddDatabase("shortlink-db", "shortlink"))
+        .WithEnvironment("Database__Provider", "PostgreSql")
+        .WithEnvironment("Database__ConnectionString", connectionString);
+}
+else if (useMySql)
 {
     // 口令只用于本地开发容器，生产走 Secret；不要往这里抄线上口令。
     // publish 时刻意不给默认值：生成的 .env / Helm values 里留空，由运维填。
@@ -283,9 +319,21 @@ void AddComposeEnvironment()
         .WithDashboard(dashboardEnabled)
         .ConfigureComposeFile(file =>
         {
-            // MySQL 8.4 初始化要十几秒，而 compose 默认只等「容器启动」。
+            // PostgreSQL / MySQL 初始化要一段时间，而 compose 默认只等「容器启动」。
             // Api 启动即跑迁移，抢在初始化完成之前就会失败退出（且 compose 不会自动重试），
-            // 所以给 mysql 加健康检查，再把 api 的依赖条件提到 service_healthy。
+            // 所以给数据库容器加健康检查，再把 api 的依赖条件提到 service_healthy。
+            if (file.Services.TryGetValue("postgres", out var postgres))
+            {
+                postgres.Healthcheck = new Healthcheck
+                {
+                    Test = ["CMD-SHELL", "pg_isready -U postgres -d shortlink"],
+                    Interval = "10s",
+                    Timeout = "5s",
+                    Retries = 12,
+                    StartPeriod = "10s",
+                };
+            }
+
             if (file.Services.TryGetValue("mysql", out var mysql))
             {
                 mysql.Healthcheck = new Healthcheck
@@ -303,6 +351,11 @@ void AddComposeEnvironment()
                 // 不使用框架的“信任所有上游”快捷开关；需要反代时由部署方显式配置可信代理。
                 apiService.Environment["ASPNETCORE_FORWARDEDHEADERS_ENABLED"] = "false";
                 apiService.Environment["ReverseProxy__TrustForwardedHeaders"] = "false";
+
+                if (apiService.DependsOn.TryGetValue("postgres", out var postgresDependency))
+                {
+                    postgresDependency.Condition = "service_healthy";
+                }
 
                 if (apiService.DependsOn.TryGetValue("mysql", out var mysqlDependency))
                 {
