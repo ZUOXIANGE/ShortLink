@@ -43,6 +43,43 @@ public sealed class ClickEventConfiguration : IEntityTypeConfiguration<ClickEven
     }
 }
 
+public sealed class ClickEventArchiveConfiguration : IEntityTypeConfiguration<ClickEventArchive>
+{
+    public void Configure(EntityTypeBuilder<ClickEventArchive> builder)
+    {
+        builder.ToTable("click_events_archive");
+        builder.HasKey(x => x.Id);
+
+        // 主键沿用原明细 id，值由归档搬运方写入，不能让数据库再生成。
+        builder.Property(x => x.Id).HasColumnName("id").ValueGeneratedNever();
+        builder.Property(x => x.EventId).HasColumnName("event_id").IsRequired();
+        builder.Property(x => x.WorkspaceId).HasColumnName("workspace_id").IsRequired();
+        builder.Property(x => x.LinkId).HasColumnName("link_id").IsRequired();
+        builder.Property(x => x.DomainId).HasColumnName("domain_id").IsRequired();
+        builder.Property(x => x.RouteId).HasColumnName("route_id");
+        builder.Property(x => x.Code).HasColumnName("code").HasMaxLength(32).IsRequired();
+        builder.Property(x => x.ClickedAtUtc).HasColumnName("clicked_at_utc").IsRequired();
+        builder.Property(x => x.ClickDate).HasColumnName("click_date").IsRequired();
+        builder.Property(x => x.VisitorHash).HasColumnName("visitor_hash").HasMaxLength(64).IsRequired();
+        builder.Property(x => x.Ip).HasColumnName("ip").HasMaxLength(64);
+        builder.Property(x => x.UserAgent).HasColumnName("user_agent").HasMaxLength(512);
+        builder.Property(x => x.Referer).HasColumnName("referer").HasMaxLength(1024);
+        builder.Property(x => x.Country).HasColumnName("country").HasMaxLength(64);
+        builder.Property(x => x.Province).HasColumnName("province").HasMaxLength(64);
+        builder.Property(x => x.Device).HasColumnName("device").HasMaxLength(32);
+        builder.Property(x => x.Browser).HasColumnName("browser").HasMaxLength(64);
+        builder.Property(x => x.OperatingSystem).HasColumnName("operating_system").HasMaxLength(64);
+        builder.Property(x => x.IsBot).HasColumnName("is_bot").IsRequired();
+        builder.Property(x => x.ArchivedAtUtc).HasColumnName("archived_at_utc").IsRequired();
+
+        builder.HasIndex(x => x.EventId).IsUnique().HasDatabaseName("ux_click_events_archive_event_id");
+        builder.HasIndex(x => new { x.ClickedAtUtc, x.Id }).HasDatabaseName("ix_click_events_archive_clicked_id");
+        builder.HasIndex(x => new { x.LinkId, x.ClickDate }).HasDatabaseName("ix_click_events_archive_link_date");
+        builder.HasIndex(x => new { x.WorkspaceId, x.ClickDate }).HasDatabaseName("ix_click_events_archive_workspace_date");
+        builder.HasIndex(x => x.ClickDate).HasDatabaseName("ix_click_events_archive_click_date");
+    }
+}
+
 public sealed class ClickRetentionLeaseConfiguration : IEntityTypeConfiguration<ClickRetentionLease>
 {
     public void Configure(EntityTypeBuilder<ClickRetentionLease> builder)

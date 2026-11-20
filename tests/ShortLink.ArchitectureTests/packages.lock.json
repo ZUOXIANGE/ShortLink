@@ -510,6 +510,17 @@
           "Microsoft.Extensions.Options": "10.0.14"
         }
       },
+      "Microsoft.Extensions.Diagnostics.HealthChecks": {
+        "type": "Transitive",
+        "resolved": "10.0.0",
+        "contentHash": "4x6y2Uy+g9Ou93eBCVkG/3JCwnc2AMKhrE1iuEhXT/MzNN7co/Zt6yL+q1Srt0CnOe3iLX+sVqpJI4ZGlOPfug==",
+        "dependencies": {
+          "Microsoft.Extensions.Diagnostics.HealthChecks.Abstractions": "10.0.0",
+          "Microsoft.Extensions.Hosting.Abstractions": "10.0.0",
+          "Microsoft.Extensions.Logging.Abstractions": "10.0.0",
+          "Microsoft.Extensions.Options": "10.0.0"
+        }
+      },
       "Microsoft.Extensions.Diagnostics.HealthChecks.Abstractions": {
         "type": "Transitive",
         "resolved": "10.0.0",
@@ -577,6 +588,19 @@
           "Microsoft.Extensions.Diagnostics.Abstractions": "10.0.14",
           "Microsoft.Extensions.FileProviders.Abstractions": "10.0.14",
           "Microsoft.Extensions.Logging.Abstractions": "10.0.14"
+        }
+      },
+      "Microsoft.Extensions.Http": {
+        "type": "Transitive",
+        "resolved": "10.0.0",
+        "contentHash": "r+mSvm/Ryc/iYcc9zcUG5VP9EBB8PL1rgVU6macEaYk45vmGRk9PntM3aynFKN6s3Q4WW36kedTycIctctpTUQ==",
+        "dependencies": {
+          "Microsoft.Extensions.Configuration.Abstractions": "10.0.0",
+          "Microsoft.Extensions.DependencyInjection.Abstractions": "10.0.0",
+          "Microsoft.Extensions.Diagnostics": "10.0.0",
+          "Microsoft.Extensions.Logging": "10.0.0",
+          "Microsoft.Extensions.Logging.Abstractions": "10.0.0",
+          "Microsoft.Extensions.Options": "10.0.0"
         }
       },
       "Microsoft.Extensions.Logging": {
@@ -915,6 +939,30 @@
         "type": "Transitive",
         "resolved": "8.6.5",
         "contentHash": "t+sUVrIwvo7UmsgHGgOG9F0GDZSRIm47u2ylH17Gvcv1q5hNEwgD5GoBlFyc0kh/pebmPyrAgvGsR/65ZBaXlg=="
+      },
+      "Quartz.AspNetCore": {
+        "type": "Transitive",
+        "resolved": "4.7.3",
+        "contentHash": "c9GQaoVwTyzws/Nz2eKN26NKiN1mjQYf2QFKYLqrasnIDhMeTSsQW0lGOChqF/iffgQ3s42AAhsdS0mGU3omag==",
+        "dependencies": {
+          "Quartz": "4.7.3"
+        }
+      },
+      "Quartz.HttpClient": {
+        "type": "Transitive",
+        "resolved": "4.7.3",
+        "contentHash": "XHt3noAHd7c2qZH4q1DRnCuoivcmghuB5JEtnUOqLejHIdJAy4xG0HKYO5Zkkj9/57pxuthFQDbuRe/oL1OuXQ==",
+        "dependencies": {
+          "Microsoft.Extensions.Configuration.Binder": "10.0.0",
+          "Microsoft.Extensions.DependencyInjection": "10.0.0",
+          "Microsoft.Extensions.Diagnostics.HealthChecks": "10.0.0",
+          "Microsoft.Extensions.Hosting.Abstractions": "10.0.0",
+          "Microsoft.Extensions.Http": "10.0.0",
+          "Microsoft.Extensions.Logging": "10.0.0",
+          "Microsoft.Extensions.Logging.Abstractions": "10.0.0",
+          "Microsoft.Extensions.Options.ConfigurationExtensions": "10.0.0",
+          "Quartz": "4.7.3"
+        }
       },
       "RabbitMQ.Client": {
         "type": "Transitive",
@@ -1274,6 +1322,7 @@
           "OpenTelemetry.Instrumentation.EntityFrameworkCore": "[1.21.0-beta.1, )",
           "OpenTelemetry.Instrumentation.Http": "[1.21.0, )",
           "OpenTelemetry.Instrumentation.Runtime": "[1.21.0, )",
+          "Quartz.Dashboard": "[4.7.3, )",
           "Scalar.AspNetCore": "[2.21.0, )",
           "Serilog.AspNetCore": "[10.0.0, )",
           "Serilog.Enrichers.Span": "[3.1.0, )",
@@ -1319,6 +1368,7 @@
           "Microting.EntityFrameworkCore.MySql": "[10.0.14, )",
           "MySqlConnector": "[3.0.0, )",
           "Npgsql.EntityFrameworkCore.PostgreSQL": "[10.0.3, )",
+          "Quartz": "[4.7.3, )",
           "ShortLink.Application": "[0.1.0, )",
           "WolverineFx": "[6.64.0, )",
           "WolverineFx.EntityFrameworkCore": "[6.64.0, )",
@@ -1615,6 +1665,30 @@
         "contentHash": "CpkfBbVIHR6Jn8QrGwt7RtOEDyKOHL2rs9HL+5ckzvlsvQiJ5lHD/qvB7NqJuFZIvXnACSYB7AD0ycXITPQFPg==",
         "dependencies": {
           "OpenTelemetry.Api": "[1.21.0, 2.0.0)"
+        }
+      },
+      "Quartz": {
+        "type": "CentralTransitive",
+        "requested": "[4.7.3, )",
+        "resolved": "4.7.3",
+        "contentHash": "/eX2Xo6eJAfupXGRjmcCy5Jpn/6NOBXDuUKTK2tY228yQ23tYUv0eeejwEbNlyxEJITIv1ajddTmYib+mMBxmQ==",
+        "dependencies": {
+          "Microsoft.Extensions.Configuration.Binder": "10.0.0",
+          "Microsoft.Extensions.DependencyInjection": "10.0.0",
+          "Microsoft.Extensions.Diagnostics.HealthChecks": "10.0.0",
+          "Microsoft.Extensions.Hosting.Abstractions": "10.0.0",
+          "Microsoft.Extensions.Logging.Abstractions": "10.0.0",
+          "Microsoft.Extensions.Options.ConfigurationExtensions": "10.0.0"
+        }
+      },
+      "Quartz.Dashboard": {
+        "type": "CentralTransitive",
+        "requested": "[4.7.3, )",
+        "resolved": "4.7.3",
+        "contentHash": "l8lH8VSSLmB+xcjCk1DPR2XSrc7a8XxKDhMGjvfGzpnNpnmybF/z67mOXeZ2JhIkyefGm5vMB8V0xC82zwSHug==",
+        "dependencies": {
+          "Quartz.AspNetCore": "4.7.3",
+          "Quartz.HttpClient": "4.7.3"
         }
       },
       "Riok.Mapperly": {

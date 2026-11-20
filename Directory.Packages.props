@@ -40,6 +40,15 @@
     <PackageVersion Include="ZiggyCreatures.FusionCache.Backplane.StackExchangeRedis" Version="2.9.0" />
     <PackageVersion Include="MaxMind.GeoIP2" Version="6.1.0" />
   </ItemGroup>
+  <ItemGroup Label="调度">
+    <!--
+      Quartz.NET 4.x 只产出 net10.0，且 DI/Hosting 已合入核心包（不再有 Quartz.Extensions.Hosting）。
+      本地调度用 RAMJobStore：多实例互斥仍由 click_retention_leases 租约保证，不引入 Quartz 自带的库表。
+    -->
+    <PackageVersion Include="Quartz" Version="4.7.3" />
+    <!-- Dashboard 是 ASP.NET Core 宿主侧组件，只允许 ShortLink.Api 引用。 -->
+    <PackageVersion Include="Quartz.Dashboard" Version="4.7.3" />
+  </ItemGroup>
   <ItemGroup Label="代码生成">
     <!--
       编译期展开端点/服务注册，替代运行期反射扫描（AOT 友好，启动无额外开销）。

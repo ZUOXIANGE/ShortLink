@@ -740,6 +740,121 @@ namespace ShortLink.Infrastructure.Migrations.Sqlite.Migrations
                     b.ToTable("workspace_members", (string)null);
                 });
 
+            modelBuilder.Entity("ShortLink.Infrastructure.Persistence.ClickEventArchive", b =>
+                {
+                    b.Property<long>("Id")
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("id");
+
+                    b.Property<DateTime>("ArchivedAtUtc")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("archived_at_utc");
+
+                    b.Property<string>("Browser")
+                        .HasMaxLength(64)
+                        .HasColumnType("TEXT")
+                        .HasColumnName("browser");
+
+                    b.Property<DateOnly>("ClickDate")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("click_date");
+
+                    b.Property<DateTime>("ClickedAtUtc")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("clicked_at_utc");
+
+                    b.Property<string>("Code")
+                        .IsRequired()
+                        .HasMaxLength(32)
+                        .HasColumnType("TEXT")
+                        .HasColumnName("code");
+
+                    b.Property<string>("Country")
+                        .HasMaxLength(64)
+                        .HasColumnType("TEXT")
+                        .HasColumnName("country");
+
+                    b.Property<string>("Device")
+                        .HasMaxLength(32)
+                        .HasColumnType("TEXT")
+                        .HasColumnName("device");
+
+                    b.Property<long>("DomainId")
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("domain_id");
+
+                    b.Property<Guid>("EventId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("event_id");
+
+                    b.Property<string>("Ip")
+                        .HasMaxLength(64)
+                        .HasColumnType("TEXT")
+                        .HasColumnName("ip");
+
+                    b.Property<bool>("IsBot")
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("is_bot");
+
+                    b.Property<long>("LinkId")
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("link_id");
+
+                    b.Property<string>("OperatingSystem")
+                        .HasMaxLength(64)
+                        .HasColumnType("TEXT")
+                        .HasColumnName("operating_system");
+
+                    b.Property<string>("Province")
+                        .HasMaxLength(64)
+                        .HasColumnType("TEXT")
+                        .HasColumnName("province");
+
+                    b.Property<string>("Referer")
+                        .HasMaxLength(1024)
+                        .HasColumnType("TEXT")
+                        .HasColumnName("referer");
+
+                    b.Property<long?>("RouteId")
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("route_id");
+
+                    b.Property<string>("UserAgent")
+                        .HasMaxLength(512)
+                        .HasColumnType("TEXT")
+                        .HasColumnName("user_agent");
+
+                    b.Property<string>("VisitorHash")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("TEXT")
+                        .HasColumnName("visitor_hash");
+
+                    b.Property<long>("WorkspaceId")
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("workspace_id");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ClickDate")
+                        .HasDatabaseName("ix_click_events_archive_click_date");
+
+                    b.HasIndex("EventId")
+                        .IsUnique()
+                        .HasDatabaseName("ux_click_events_archive_event_id");
+
+                    b.HasIndex("ClickedAtUtc", "Id")
+                        .HasDatabaseName("ix_click_events_archive_clicked_id");
+
+                    b.HasIndex("LinkId", "ClickDate")
+                        .HasDatabaseName("ix_click_events_archive_link_date");
+
+                    b.HasIndex("WorkspaceId", "ClickDate")
+                        .HasDatabaseName("ix_click_events_archive_workspace_date");
+
+                    b.ToTable("click_events_archive", (string)null);
+                });
+
             modelBuilder.Entity("ShortLink.Infrastructure.Persistence.ClickRetentionLease", b =>
                 {
                     b.Property<string>("Name")

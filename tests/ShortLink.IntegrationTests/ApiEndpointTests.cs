@@ -1,6 +1,7 @@
 using System.Net;
 using System.Net.Http.Json;
 using System.Text.Json;
+using System.Text.RegularExpressions;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.Extensions.Configuration;
@@ -139,6 +140,58 @@ public sealed class ApiEndpointTests(ApiFactory factory)
 
         Assert.Equal(BizCodes.InvalidCredentials, envelope!.Code);
         Assert.Null(envelope.Data);
+    }
+
+    [Fact]
+    public async Task Quartz_Dashboard_Should_Require_Login_And_Accept_Admin_Cookie()
+    {
+        var client = factory.CreateClient(new WebApplicationFactoryClientOptions { AllowAutoRedirect = false });
+
+        // 未登录访问 Dashboard 必须被引导到登录页，而不是 JSON 信封或裸 401。
+        var anonymous = await client.GetAsync("/quartz", TestContext.Current.CancellationToken);
+        Assert.Equal(HttpStatusCode.Redirect, anonymous.StatusCode);
+        Assert.StartsWith("/quartz-login", anonymous.Headers.Location!.OriginalString);
+
+        var loginPage = await client.GetAsync("/quartz-login", TestContext.Current.CancellationToken);
+        Assert.Equal(HttpStatusCode.OK, loginPage.StatusCode);
+        Assert.Equal("text/html", loginPage.Content.Headers.ContentType!.MediaType);
+
+        var html = await loginPage.Content.ReadAsStringAsync(TestContext.Current.CancellationToken);
+        Assert.Contains("Quartz 调度台", html, StringComparison.Ordinal);
+
+        var token = Regex.Match(
+            html,
+            "name=\"__RequestVerificationToken\" value=\"([^\"]+)\"").Groups[1].Value;
+        Assert.False(string.IsNullOrEmpty(token));
+
+        var login = await client.PostAsync(
+            "/quartz-login",
+            new FormUrlEncodedContent(new Dictionary<string, string>
+            {
+                ["__RequestVerificationToken"] = token,
+                ["userName"] = "admin",
+                ["password"] = "Admin@123456",
+                ["returnUrl"] = "/quartz",
+            }),
+            TestContext.Current.CancellationToken);
+
+        Assert.Equal(HttpStatusCode.Redirect, login.StatusCode);
+        Assert.Equal("/quartz", login.Headers.Location!.OriginalString);
+
+        // Cookie 由 HttpClient 自动保存；Dashboard 必须真正渲染出 Blazor 宿主页。
+        var dashboard = await client.GetAsync("/quartz", TestContext.Current.CancellationToken);
+        Assert.Equal(HttpStatusCode.OK, dashboard.StatusCode);
+        var dashboardHtml = await dashboard.Content.ReadAsStringAsync(TestContext.Current.CancellationToken);
+        Assert.Contains("_framework/blazor", dashboardHtml, StringComparison.OrdinalIgnoreCase);
+
+        // 静态 Web 资源必须真的可下载；只有 HTML 能打开、脚本 404 时页面同样是死的。
+        var script = Regex.Match(
+            dashboardHtml,
+            "src=\"([^\"]*_framework/[^\"]+)\"").Groups[1].Value;
+        Assert.False(string.IsNullOrEmpty(script));
+
+        var asset = await client.GetAsync(script, TestContext.Current.CancellationToken);
+        Assert.Equal(HttpStatusCode.OK, asset.StatusCode);
     }
 
     [Fact]

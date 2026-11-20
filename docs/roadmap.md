@@ -50,7 +50,8 @@
 | 消息总线 | ✅ | Wolverine：点击落库批处理 + 封顶审计；`local`/`rabbitmq`/`kafka` 可切换；`Durable` 只对低频事件启用本地消息表，**点击永远走内存队列** |
 | OIDC 登录与账号绑定 | ⬜ | 对接企业 IdP，保留本地账号作为兜底 |
 | 安装向导 | ⬜ | 首次启动的配置向导（当前用 `Seed` + 配置文件替代） |
-| 数据归档 | ⬜ | 点击明细按天归档到冷存储（当前只有删除，没有归档） |
+| 数据归档 | ✅ | 点击明细按月搬运到 `click_events_archive`（Quartz 调度，默认关闭；归档表本身不自动清理） |
+| 调度可视化 | ✅ | Quartz Dashboard（`/quartz`，默认关闭）；复用后台账号登录，仅 Owner/Admin，默认只读 |
 | MCP OAuth 2.1 | ⬜ | Protected Resource Metadata 与动态客户端注册；当前只支持静态 Bearer JWT |
 | Kafka 生产验证 | ⬜ | 当前只做配置可切换 + local 路径全覆盖，未接真实 broker 跑端到端消费 |
 | 统计口径时区 | ✅ | `Analytics:TimeZone` 决定 `click_date` 分桶与「今日」边界，写入与读取共用 `IStatisticsCalendar`；启动期校验时区 id |
@@ -80,7 +81,7 @@
 6. **路由规则整表覆盖**：`PUT /links/{id}/routes` 是全量覆盖（删旧插新），分支 ID 会变化，因此历史点击只能靠分支名称归集。若需要长期稳定的分支 ID，应改为按 (link_id, name) 做 upsert。
 7. **IP 名单为文本列**：`ip_allow_list` / `ip_block_list` 以逗号/换行分隔文本存储，匹配在内存里做（单链量级可接受）；规则规模上来后应拆成独立表并前置到网关层。
 8. **导出上限**：短链列表流式导出以 10 万行为硬顶，超出部分不返回；需要全量时按时间分片导出。
-9. **保留策略只删不归档**：`ClickRetentionService` 直接 `DELETE` 过期明细。需要长期留存归因数据时必须先补归档链路（导出到对象存储），否则开启清理即等于放弃历史明细。
+9. **归档表没有自动清理**：开启 `Analytics:Archive` 后，过期明细按月搬入 `click_events_archive`；主表只保留热数据，但归档表会持续增长，需要部署方自行制定归档表的保留/冷存策略。未开启归档时，每日清理仍是直接 `DELETE`。
 10. **限流分区依赖代理头**：未开启 `ReverseProxy:TrustForwardedHeaders` 时分区键是代理 IP，全站共享一个桶——反代部署下这一项是强制的。另需注意限流只按 IP，不按账号，共享出口（企业 NAT、运营商大内网）下的用户会互相影响。
 11. **MCP 只支持静态 Bearer 令牌**：未实现 OAuth 2.1 的 Protected Resource Metadata 与动态客户端注册，接入方需手工把登录令牌配进客户端。令牌过期后工具调用会直接 401，没有刷新协商。
 12. **MCP 读写共用一份配额**：`Mcp:PermitPerMinute` 对全部工具生效，写工具没有单独桶。批量建链与批量查询会互相挤占，量上来后需拆分。

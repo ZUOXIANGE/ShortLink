@@ -69,4 +69,10 @@ public static class ShortLinkDiagnostics
         "shortlink.clicks.purged",
         unit: "{click}",
         description: "按保留策略清理的点击明细行数");
+
+    /// <summary>点击明细归档搬运的行数。</summary>
+    public static readonly Counter<long> ClicksArchived = Meter.CreateCounter<long>(
+        "shortlink.clicks.archived",
+        unit: "{click}",
+        description: "按月从明细表搬运到归档表的点击行数");
 }

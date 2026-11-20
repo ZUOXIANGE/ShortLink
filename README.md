@@ -59,7 +59,8 @@
 
 - 限流按分区键隔离：登录 / 转化 / 举报按来源 IP，访问密码按 IP + 短码，MCP 按调用者；配置 Redis 后自动切换 Lua 原子计数，故障回落本地窗口并累加指标
 - `/health` 只证明进程活着，`/health/ready` 校验数据库与缓存，`/health/info` 输出缓存拓扑与统计时区
-- 点击明细保留策略：分批删除、数据库租约互斥、默认关闭
+- 点击明细生命周期：Quartz 调度月度归档（`click_events_archive`）与每日清理，数据库租约互斥，两者默认关闭
+- Quartz Dashboard（`/quartz`，默认关闭）：查看归档/清理任务的执行与下一次触发时间，登录复用后台账号，仅 Owner/Admin 可访问且默认只读
 - MCP Server（`ShortLink.Mcp`，默认关闭）：AI 客户端可经 `/mcp` 建链、查数、看统计，失败返回 `IsError = true`
 
 ## 快速开始
@@ -230,6 +231,7 @@ ShortLink__PublishTarget=kubernetes dotnet aspire publish -o artifacts/k8s
 5. **上线前定统计时区**：`Analytics:TimeZone` 默认 `UTC`，`click_date` 写入时算好，切换不回溯历史。
 6. **来源地默认信任请求头**：CDN 或反向代理必须剥离客户端同名头；公网部署建议配置 `GeoIp:DatabasePath` 使用离线库。
 7. **MCP 默认关闭**：开启后等于多一个写入口，权限与令牌所属账号一致；公网暴露需收紧 `AllowedHosts` 与 `Mcp:PermitPerMinute`。
+8. **Quartz Dashboard 默认关闭**：开启（`QuartzDashboard:Enabled=true`）后经 `/quartz-login` 用 Owner/Admin 账号登录；不要对它 `AllowAnonymous`，需要写操作时再显式关掉 `ReadOnly`。
 
 更完整的性能容量与运维说明见 `docs/architecture.md`。
 

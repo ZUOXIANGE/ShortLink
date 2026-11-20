@@ -31,6 +31,12 @@
           "FluentValidation": "12.2.0"
         }
       },
+      "Microsoft.AspNetCore.App.Internal.Assets": {
+        "type": "Direct",
+        "requested": "[10.0.15, )",
+        "resolved": "10.0.15",
+        "contentHash": "cineG7aU2cpo+CC5rDORY4bFRya0mlaULDpzQ+ncfG0tMyZlWATyVAo2P29i0hH40EElK5O204pjT4XEYALb6g=="
+      },
       "Microsoft.AspNetCore.Authentication.JwtBearer": {
         "type": "Direct",
         "requested": "[10.0.15, )",
@@ -118,6 +124,16 @@
         "contentHash": "CpkfBbVIHR6Jn8QrGwt7RtOEDyKOHL2rs9HL+5ckzvlsvQiJ5lHD/qvB7NqJuFZIvXnACSYB7AD0ycXITPQFPg==",
         "dependencies": {
           "OpenTelemetry.Api": "[1.21.0, 2.0.0)"
+        }
+      },
+      "Quartz.Dashboard": {
+        "type": "Direct",
+        "requested": "[4.7.3, )",
+        "resolved": "4.7.3",
+        "contentHash": "l8lH8VSSLmB+xcjCk1DPR2XSrc7a8XxKDhMGjvfGzpnNpnmybF/z67mOXeZ2JhIkyefGm5vMB8V0xC82zwSHug==",
+        "dependencies": {
+          "Quartz.AspNetCore": "4.7.3",
+          "Quartz.HttpClient": "4.7.3"
         }
       },
       "Scalar.AspNetCore": {
@@ -769,6 +785,22 @@
         "resolved": "8.6.5",
         "contentHash": "t+sUVrIwvo7UmsgHGgOG9F0GDZSRIm47u2ylH17Gvcv1q5hNEwgD5GoBlFyc0kh/pebmPyrAgvGsR/65ZBaXlg=="
       },
+      "Quartz.AspNetCore": {
+        "type": "Transitive",
+        "resolved": "4.7.3",
+        "contentHash": "c9GQaoVwTyzws/Nz2eKN26NKiN1mjQYf2QFKYLqrasnIDhMeTSsQW0lGOChqF/iffgQ3s42AAhsdS0mGU3omag==",
+        "dependencies": {
+          "Quartz": "4.7.3"
+        }
+      },
+      "Quartz.HttpClient": {
+        "type": "Transitive",
+        "resolved": "4.7.3",
+        "contentHash": "XHt3noAHd7c2qZH4q1DRnCuoivcmghuB5JEtnUOqLejHIdJAy4xG0HKYO5Zkkj9/57pxuthFQDbuRe/oL1OuXQ==",
+        "dependencies": {
+          "Quartz": "4.7.3"
+        }
+      },
       "RabbitMQ.Client": {
         "type": "Transitive",
         "resolved": "7.2.2",
@@ -1034,6 +1066,7 @@
           "Microting.EntityFrameworkCore.MySql": "[10.0.14, )",
           "MySqlConnector": "[3.0.0, )",
           "Npgsql.EntityFrameworkCore.PostgreSQL": "[10.0.3, )",
+          "Quartz": "[4.7.3, )",
           "ShortLink.Application": "[0.1.0, )",
           "WolverineFx": "[6.64.0, )",
           "WolverineFx.EntityFrameworkCore": "[6.64.0, )",
@@ -1191,6 +1224,12 @@
           "Microsoft.EntityFrameworkCore.Relational": "[10.0.4, 11.0.0)",
           "Npgsql": "10.0.3"
         }
+      },
+      "Quartz": {
+        "type": "CentralTransitive",
+        "requested": "[4.7.3, )",
+        "resolved": "4.7.3",
+        "contentHash": "/eX2Xo6eJAfupXGRjmcCy5Jpn/6NOBXDuUKTK2tY228yQ23tYUv0eeejwEbNlyxEJITIv1ajddTmYib+mMBxmQ=="
       },
       "Riok.Mapperly": {
         "type": "CentralTransitive",

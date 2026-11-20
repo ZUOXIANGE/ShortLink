@@ -8,7 +8,10 @@ namespace ShortLink.Api.Infrastructure;
 /// 框架层状态码归一化：404 / 405 / 415 等由框架直接产生的结果也要转成统一信封。
 /// 白名单排除探针、OpenAPI 文档、静态资源、短码跳转与 MCP 端点。
 /// </summary>
-public sealed class ResponseNormalizationMiddleware(RequestDelegate next, IOptions<McpOptions> mcpOptions)
+public sealed class ResponseNormalizationMiddleware(
+    RequestDelegate next,
+    IOptions<McpOptions> mcpOptions,
+    IOptions<ShortLinkQuartzDashboardOptions> dashboardOptions)
 {
     private static readonly string[] ExcludedPrefixes =
     [
@@ -28,6 +31,11 @@ public sealed class ResponseNormalizationMiddleware(RequestDelegate next, IOptio
     /// 路径来自配置，改 <c>Mcp:Path</c> 时不需要同步改这里。
     /// </summary>
     private readonly string? _mcpPath = mcpOptions.Value.Enabled ? mcpOptions.Value.Path : null;
+
+    /// <summary>Dashboard 页面/静态资源/回路走浏览器语义，不能被包装成 200 信封。</summary>
+    private readonly string? _dashboardPath = dashboardOptions.Value.Enabled
+        ? dashboardOptions.Value.NormalizedPath
+        : null;
 
     public async Task InvokeAsync(HttpContext context)
     {
@@ -108,6 +116,12 @@ public sealed class ResponseNormalizationMiddleware(RequestDelegate next, IOptio
         }
 
         if (_mcpPath is not null && path.StartsWithSegments(_mcpPath, StringComparison.OrdinalIgnoreCase))
+        {
+            return true;
+        }
+
+        if (_dashboardPath is not null
+            && path.StartsWithSegments(_dashboardPath, StringComparison.OrdinalIgnoreCase))
         {
             return true;
         }

@@ -62,9 +62,40 @@ public static class AuthenticationSetup
 
             bearer.Events = new JwtBearerEvents
             {
+                // Dashboard 是浏览器页面，拿不到 Authorization 头；
+                // 登录后把同一枚 JWT 放进 HttpOnly Cookie，这里只对 Dashboard 相关路径回读。
+                OnMessageReceived = context =>
+                {
+                    if (string.IsNullOrEmpty(context.Token)
+                        && QuartzDashboardSetup.IsDashboardRequest(context.HttpContext))
+                    {
+                        context.Token = context.Request.Cookies[QuartzDashboardSetup.CookieName];
+                    }
+
+                    return Task.CompletedTask;
+                },
                 OnTokenValidated = ValidateTokenAsync,
                 OnChallenge = async context =>
                 {
+                    // 浏览器导航到 Dashboard 时给一个登录页，而不是 JSON 信封或裸 401。
+                    if (QuartzDashboardSetup.IsDashboardPageRequest(context.HttpContext))
+                    {
+                        context.HandleResponse();
+                        var request = context.HttpContext.Request;
+                        var returnUrl = request.Path + request.QueryString;
+                        context.HttpContext.Response.Redirect(
+                            $"{QuartzDashboardSetup.LoginPath}?returnUrl={Uri.EscapeDataString(returnUrl)}");
+                        return;
+                    }
+
+                    // Blazor 回路与静态资源保持真实 401，避免把 JS/CSS 重定向成 HTML。
+                    if (QuartzDashboardSetup.IsDashboardRequest(context.HttpContext))
+                    {
+                        context.HandleResponse();
+                        context.HttpContext.Response.StatusCode = StatusCodes.Status401Unauthorized;
+                        return;
+                    }
+
                     context.HandleResponse();
 
                     // MCP 客户端靠真实 401 触发重新认证，并按 WWW-Authenticate 做资源发现。
@@ -89,6 +120,19 @@ public static class AuthenticationSetup
                 },
                 OnForbidden = async context =>
                 {
+                    if (QuartzDashboardSetup.IsDashboardPageRequest(context.HttpContext))
+                    {
+                        context.HttpContext.Response.Redirect(
+                            $"{QuartzDashboardSetup.LoginPath}?denied=1");
+                        return;
+                    }
+
+                    if (QuartzDashboardSetup.IsDashboardRequest(context.HttpContext))
+                    {
+                        context.HttpContext.Response.StatusCode = StatusCodes.Status403Forbidden;
+                        return;
+                    }
+
                     // 同上：MCP 侧保持 403 原始语义，交给客户端框架处理。
                     if (IsMcpRequest(context.HttpContext))
                     {

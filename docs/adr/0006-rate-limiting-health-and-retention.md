@@ -64,7 +64,7 @@ return {1, 0}
 
 `ICacheHealthProbe` 在未注册 `IConnectionMultiplexer` 时恒返回健康：没配 Redis 就是「不需要缓存」，不是「缓存不可用」。这条让 SQLite 单机部署不会被误判。
 
-### 5. 保留策略默认关闭，且只删不归档
+### 5. 保留策略默认关闭；归档默认关闭且可选
 
 `Analytics:Retention:Enabled` 默认 `false`。理由：删除不可逆，任何默认开启的数据删除都是给运维埋雷。开启后：
 
@@ -81,4 +81,4 @@ return {1, 0}
 - 反代部署下 `ReverseProxy:TrustForwardedHeaders=true` 从「建议」升级为「必须」。
 - `click_events` 有了明确的增长上界（保留天数 × 日增），容量规划可以算出来。
 - 探针配置错误的风险转移到了部署侧文档，代码侧不再提供「一个端点全搞定」的捷径。
-- 尚未实现：明细**归档**（导出到对象存储后再删）。当前只有删除，这对需要长期留存归因数据的场景不够，已列在 `docs/roadmap.md` 的未实现项中。
+- 后续补充：`Analytics:Archive` 开启后，Quartz 每月把过期明细搬入 `click_events_archive` 再从主表删除，归档期间每日清理自动让位；归档关闭时行为仍是「只删不归档」。归档表本身需要部署方制定保留/冷存策略。

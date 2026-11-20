@@ -25,6 +25,8 @@ public sealed class ShortLinkDbContext(DbContextOptions<ShortLinkDbContext> opti
 
     public DbSet<ClickEvent> ClickEvents => Set<ClickEvent>();
 
+    public DbSet<ClickEventArchive> ClickEventArchives => Set<ClickEventArchive>();
+
     public DbSet<ClickRetentionLease> ClickRetentionLeases => Set<ClickRetentionLease>();
 
     public DbSet<ConversionEvent> Conversions => Set<ConversionEvent>();

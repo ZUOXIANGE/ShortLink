@@ -765,6 +765,121 @@ namespace ShortLink.Infrastructure.Migrations.PostgreSql.Migrations
                     b.ToTable("workspace_members", (string)null);
                 });
 
+            modelBuilder.Entity("ShortLink.Infrastructure.Persistence.ClickEventArchive", b =>
+                {
+                    b.Property<long>("Id")
+                        .HasColumnType("bigint")
+                        .HasColumnName("id");
+
+                    b.Property<DateTime>("ArchivedAtUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("archived_at_utc");
+
+                    b.Property<string>("Browser")
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)")
+                        .HasColumnName("browser");
+
+                    b.Property<DateOnly>("ClickDate")
+                        .HasColumnType("date")
+                        .HasColumnName("click_date");
+
+                    b.Property<DateTime>("ClickedAtUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("clicked_at_utc");
+
+                    b.Property<string>("Code")
+                        .IsRequired()
+                        .HasMaxLength(32)
+                        .HasColumnType("character varying(32)")
+                        .HasColumnName("code");
+
+                    b.Property<string>("Country")
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)")
+                        .HasColumnName("country");
+
+                    b.Property<string>("Device")
+                        .HasMaxLength(32)
+                        .HasColumnType("character varying(32)")
+                        .HasColumnName("device");
+
+                    b.Property<long>("DomainId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("domain_id");
+
+                    b.Property<Guid>("EventId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("event_id");
+
+                    b.Property<string>("Ip")
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)")
+                        .HasColumnName("ip");
+
+                    b.Property<bool>("IsBot")
+                        .HasColumnType("boolean")
+                        .HasColumnName("is_bot");
+
+                    b.Property<long>("LinkId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("link_id");
+
+                    b.Property<string>("OperatingSystem")
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)")
+                        .HasColumnName("operating_system");
+
+                    b.Property<string>("Province")
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)")
+                        .HasColumnName("province");
+
+                    b.Property<string>("Referer")
+                        .HasMaxLength(1024)
+                        .HasColumnType("character varying(1024)")
+                        .HasColumnName("referer");
+
+                    b.Property<long?>("RouteId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("route_id");
+
+                    b.Property<string>("UserAgent")
+                        .HasMaxLength(512)
+                        .HasColumnType("character varying(512)")
+                        .HasColumnName("user_agent");
+
+                    b.Property<string>("VisitorHash")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)")
+                        .HasColumnName("visitor_hash");
+
+                    b.Property<long>("WorkspaceId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("workspace_id");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ClickDate")
+                        .HasDatabaseName("ix_click_events_archive_click_date");
+
+                    b.HasIndex("EventId")
+                        .IsUnique()
+                        .HasDatabaseName("ux_click_events_archive_event_id");
+
+                    b.HasIndex("ClickedAtUtc", "Id")
+                        .HasDatabaseName("ix_click_events_archive_clicked_id");
+
+                    b.HasIndex("LinkId", "ClickDate")
+                        .HasDatabaseName("ix_click_events_archive_link_date");
+
+                    b.HasIndex("WorkspaceId", "ClickDate")
+                        .HasDatabaseName("ix_click_events_archive_workspace_date");
+
+                    b.ToTable("click_events_archive", (string)null);
+                });
+
             modelBuilder.Entity("ShortLink.Infrastructure.Persistence.ClickRetentionLease", b =>
                 {
                     b.Property<string>("Name")

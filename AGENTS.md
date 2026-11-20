@@ -64,8 +64,10 @@ Api → Infrastructure → Application → Domain
 - 依赖故障时的限流必须**回落本地窗口**，既不能放行（打挂 Redis 即绕过限流）也不能全拒；同时累加指标，否则配额悄悄失真没人知道。
 - 存活探针（`/health`）不允许查外部依赖；数据库/缓存检查只放 `/health/ready`。把依赖加入存活探针 = 数据库抖动升级为全体重启。
 - `/health/info` 是**诊断口不是探针**：输出缓存背板类型、跨实例失效能力、短链 TTL、统计时区。不要把编排系统的探针接到它上面，也不要往里塞需要认证的信息。
-- `BackgroundService` 内必须 `CreateAsyncScope()` 取 scoped 服务；清理类任务要分批、设单次上限、批间停顿，并默认关闭（删除不可逆，必须由部署方显式开启）。
-- 定时任务的可测性：把「执行一次」抽成 `public` 方法（如 `ClickRetentionService.PurgeAsync`），调度壳只负责触发，测试直接驱动方法而不改系统时间。
+- 定时调度统一走 Quartz（`InfrastructureServiceCollectionExtensions.AddAnalyticsScheduling`）：`ClickArchiveJob` 按月归档、`ClickRetentionJob` 每日清理，时区固定 UTC。不要再新增手写轮询的 `BackgroundService`；确需 `BackgroundService` 时必须 `CreateAsyncScope()` 取 scoped 服务，并分批、设单次上限、批间停顿、默认关闭。
+- 定时任务的可测性：把「执行一次」抽成 `public` 方法（如 `ClickRetentionService.PurgeAsync` / `ArchiveAsync`），Quartz Job 只负责读配置与触发，测试直接驱动方法而不改系统时间。
+- 归档与清理共用 `click_retention_leases` 租约（租约名分别为 `click-archive` / `click-retention`）做跨副本互斥；**归档开启时每日清理会主动让位**，避免在月度搬运前把过期明细直接删掉。归档写入与主表删除必须同批事务提交。
+- Quartz Dashboard 默认关闭（`QuartzDashboard:Enabled`）。开启后只能经 `/quartz-login` 用后台账号登录，JWT 存 HttpOnly Cookie，仅 Owner/Admin 可访问；**禁止** `AllowAnonymous` 或把 Dashboard 直接匿名暴露。`ReadOnly` 默认 true，写操作必须由部署方显式打开。
 
 ## 消息与异步副作用
 

@@ -405,8 +405,9 @@ OTLP 端点为空时只打控制台，不外发——单机开发不需要 colle
 3. 反代 → 开 `TrustForwardedHeaders`，并在代理层剥离客户端 `CF-IPCountry`/`X-Country`/`X-Province`。
 4. 上线前定 `Analytics:TimeZone`，之后不要随意改。
 5. 存活探针接 `/health`，就绪探针接 `/health/ready`，不要把依赖塞进存活探针。
-6. 保留策略默认关闭；开启即等于放弃保留期外的明细（当前是删除，不是归档）。
+6. 保留策略与归档都默认关闭；开启归档后过期明细按月搬入 `click_events_archive`（主表不再保留），未开启时每日清理直接删除。归档表自身需要部署方制定保留策略。
 7. MCP 默认关闭；开启前确认令牌所属账号角色、限流配额、`AllowedHosts`。
+8. Quartz Dashboard 默认关闭；开启后 `/quartz` 仅 Owner/Admin 可登录（`/quartz-login`），`ReadOnly` 默认 true。禁止把 `/quartz` 配成匿名可访问。
 
 ---
 
@@ -426,7 +427,7 @@ OTLP 端点为空时只打控制台，不外发——单机开发不需要 colle
 
 ### 10.1 尚未实现
 
-OIDC 登录与账号绑定、安装向导、点击明细按天归档到冷存储、MCP OAuth 2.1（Protected Resource Metadata + 动态客户端注册）。
+OIDC 登录与账号绑定、安装向导、MCP OAuth 2.1（Protected Resource Metadata + 动态客户端注册）。
 
 ### 10.2 主要的已知技术债（完整列表见 `docs/roadmap.md`）
 

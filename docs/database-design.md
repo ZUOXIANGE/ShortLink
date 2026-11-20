@@ -41,7 +41,8 @@ dotnet ef migrations script --project src/ShortLink.Infrastructure.Migrations.My
 | `short_links` | 短链聚合根 | 随建链线性增长，量级小 | 业务删除（级联分支） |
 | `short_domains` | 域名字典 | 极少 | 有短链时禁删 |
 | `link_routes` | 条件分支 / A/B 目标 | 每条短链 ≤ 20 | 随短链级联删除 |
-| `click_events` | 点击明细 | **唯一高频增长表** | 保留策略分批 DELETE（默认关闭） |
+| `click_events` | 点击明细 | **唯一高频增长表** | 按月归档或分批 DELETE（均默认关闭） |
+| `click_events_archive` | 点击明细归档 | 随归档增长 | 暂无（由部署方制定冷存/保留策略） |
 | `conversion_events` | 转化回调 | 随转化增长，低于点击 1~2 个数量级 | 暂无（需随明细一起归档） |
 | `security_events` | 安全审计 | 低频，异常流量时陡增 | 暂无上限 |
 | `users` | 账号 | 极少 | 停用而非删除 |
@@ -202,6 +203,25 @@ erDiagram
 | `ix_click_events_link_route` | `(link_id, route_id)` | — | 分支点击聚合 |
 | `ix_click_events_workspace_date` | `(workspace_id, click_date)` | — | 工作区总览与隔离校验 |
 
+### 3.4.1 `click_events_archive` · 点击明细归档
+
+列与 `click_events` 完全一致，额外多一列 `archived_at_utc`（搬运时间）。主键沿用原明细 `id`，因此重复搬运会撞主键而不是产生重复历史；`event_id` 保留唯一索引。
+
+| 索引 | 用途 |
+| --- | --- |
+| `ix_click_events_archive_clicked_id` `(clicked_at_utc, id)` | 归档时间范围查询 |
+| `ix_click_events_archive_link_date` `(link_id, click_date)` | 单链历史回溯 |
+| `ix_click_events_archive_workspace_date` `(workspace_id, click_date)` | 工作区历史回溯 |
+| `ix_click_events_archive_click_date` `(click_date)` | 按天聚合 |
+| `ux_click_events_archive_event_id` `(event_id)` 唯一 | 幂等兜底 |
+
+搬运规则（`Analytics:Archive`，默认关闭）：
+
+- Quartz 每月固定日期 03:00 UTC 触发 `ClickArchiveJob`，按 `clicked_at_utc < now - ArchiveAfterDays` 分批搬运。
+- 每批「插入归档表 + 删除主表」在同一个事务提交；失败回滚，租约释放后下月重试。
+- 多副本由 `click_retention_leases` 的 `click-archive` 租约互斥；归档开启时每日清理任务主动让位。
+- 归档表**不会自动清理**，长期留存需要部署方另行制定冷存/删除策略。
+
 ### 3.5 `conversion_events` · 转化回调
 
 | 列 | 类型 | 空 | 说明 |
@@ -281,11 +301,11 @@ erDiagram
 
 ### 3.9 `click_retention_leases` · 清理租约
 
-多副本同时开启点击明细保留策略时，用单行租约保证只有一个实例执行删除。
+多副本同时开启点击明细归档/保留策略时，用单行租约保证只有一个实例执行搬运或删除；`name` 分别为 `click-archive` 与 `click-retention`。
 
 | 列 | 类型 | 空 | 说明 |
 | --- | --- | --- | --- |
-| `name` | varchar(64) | N | 主键，固定为保留策略的租约名 |
+| `name` | varchar(64) | N | 主键，取 `click-archive` 或 `click-retention` |
 | `owner_id` | varchar(32) | Y | 当前持有者；任务结束或释放时置空 |
 | `lease_until_utc` | datetime(6) | N | 租约到期时间；每批清理前续约 |
 | `last_completed_date` | date | Y | 最近一次成功完成的日期，用于「当天只跑一次」 |
@@ -425,7 +445,7 @@ API 启动时 `DatabaseInitializer.InitializeAsync()` 自动 `MigrateAsync()`，
 
 | # | 缺口 | 影响 | 建议 |
 | --- | --- | --- | --- |
-| 1 | **`click_events` 无分区** | 单表线性增长，历史数据只能靠 DELETE 清理，VACUUM/OPTIMIZE 压力大 | 数据量上亿后按 `click_date` 做月度分区（MySQL RANGE / PG 原生分区），或先补归档链路再做删除 |
+| 1 | **`click_events` 无分区** | 单表线性增长；归档默认关闭，未开启时历史数据只能靠 DELETE 清理，VACUUM/OPTIMIZE 压力大 | 数据量上亿后按 `click_date` 做月度分区（MySQL RANGE / PG 原生分区）；短期可开启 `Analytics:Archive` 把冷数据搬到归档表 |
 | 2 | **`ip_allow_list` / `ip_block_list` 为文本列** | 匹配在内存做；规则规模上来后无法用 SQL 查询「哪些短链封了某 IP」 | 拆 `link_ip_rules(link_id, kind, cidr)` 独立表 |
 | 3 | **`security_events` 无上限** | 被刷时表会陡增（每次拦截一行） | 加保留策略或按天分区 |
 | 4 | **`link_routes` 全量覆盖导致 ID 变化** | 历史点击只能靠分支名归集；`conversion_events.route_id` 可能指向已不存在的分支。分支名已加唯一约束，但 ID 仍不稳定 | 改为按 `(link_id, name)` upsert，保持 ID 稳定 |
@@ -466,10 +486,10 @@ API 启动时 `DatabaseInitializer.InitializeAsync()` 自动 `MigrateAsync()`，
 
 | 项 | 建议 |
 | --- | --- |
-| 保留策略 | 默认关闭。开启前确认这些明细不再需要——**当前是删除，不是归档** |
-| 批量删除 | 已实现分批 + 单次总量上限 + 批间停顿，避免长事务锁表；过滤列命中 `(clicked_at_utc, id)` |
+| 保留策略 | 归档与清理都默认关闭。开启归档后过期明细按月搬入 `click_events_archive`；未开启时清理仍是直接删除 |
+| 批量搬运/删除 | 已实现分批 + 单次总量上限 + 批间停顿，避免长事务锁表；过滤列命中 `(clicked_at_utc, id)` |
 | 统计与 OLTP 分离 | 明细表聚合查询较重，量大时建议加只读副本供统计使用 |
-| 备份 | `short_links` / `short_domains` / `users` / `workspaces` 是「不可再生数据」，必须每日全备；`click_events` 可降级为周备 |
+| 备份 | `short_links` / `short_domains` / `users` / `workspaces` 是「不可再生数据」，必须每日全备；`click_events` 可降级为周备；`click_events_archive` 若不另做冷存，也必须纳入备份 |
 | 慢查询 | 重点看「维度 TopN」与「工作区总览」；两者都应命中 §7 的索引，未命中说明统计区间过大 |
 | 索引维护 | 8 条 `click_events` 索引会显著放大写入成本。若写入成为瓶颈，先砍 `ix_click_events_date_visitor`（UV 可退化为近似值） |
 | 连接数 | 批处理与请求共用一个连接池；`MaxPoolSize` 需按「实例数 × 并发批数」留余量 |

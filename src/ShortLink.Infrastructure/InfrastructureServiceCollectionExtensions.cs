@@ -2,6 +2,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
+using Quartz;
 using ShortLink.Application.Abstractions;
 using ShortLink.Application.Abstractions.Persistence;
 using ShortLink.Application.Options;
@@ -36,6 +37,8 @@ public static class InfrastructureServiceCollectionExtensions
         services.Configure<RateLimitOptions>(configuration.GetSection(RateLimitOptions.SectionName));
         services.Configure<AnalyticsRetentionOptions>(
             configuration.GetSection(AnalyticsRetentionOptions.SectionName));
+        services.Configure<AnalyticsArchiveOptions>(
+            configuration.GetSection(AnalyticsArchiveOptions.SectionName));
         services.Configure<StatisticsOptions>(configuration.GetSection(StatisticsOptions.SectionName));
         services.Configure<GeoIpOptions>(configuration.GetSection(GeoIpOptions.SectionName));
         services.Configure<PartnerApiOptions>(configuration.GetSection(PartnerApiOptions.SectionName));
@@ -63,6 +66,11 @@ public static class InfrastructureServiceCollectionExtensions
         var partnerApi = configuration.GetSection(PartnerApiOptions.SectionName).Get<PartnerApiOptions>()
                          ?? new PartnerApiOptions();
         partnerApi.Validate();
+
+        // 归档开启但天数非法时启动失败：每日清理会为归档让位，静默跳过等于停止回收。
+        var archive = configuration.GetSection(AnalyticsArchiveOptions.SectionName).Get<AnalyticsArchiveOptions>()
+                      ?? new AnalyticsArchiveOptions();
+        archive.Validate();
 
         var cache = configuration.GetSection(CacheOptions.SectionName).Get<CacheOptions>()
                     ?? new CacheOptions();
@@ -109,8 +117,10 @@ public static class InfrastructureServiceCollectionExtensions
         // 必须在 DbContext 注册之后装配——handler 依赖 scoped 的 ShortLinkDbContext。
         services.AddShortLinkMessaging(configuration);
 
-        // 点击明细保留策略：默认关闭，开启后每天按 UTC 时间点分批回收历史明细。
-        services.AddHostedService<ClickRetentionService>();
+        // 点击明细生命周期：Quartz 负责调度，服务本身只暴露「执行一次」。
+        // 归档默认关闭；开启后按月搬运过期明细，每日清理会自动让位，避免删除未归档数据。
+        services.AddSingleton<ClickRetentionService>();
+        AddAnalyticsScheduling(services, configuration);
 
         services.AddSingleton<ILinkCache, FusionLinkCache>();
         services.AddSingleton<ICacheTopology, CacheTopology>();
@@ -170,6 +180,38 @@ public static class InfrastructureServiceCollectionExtensions
         }
 
         return services;
+    }
+
+    private static void AddAnalyticsScheduling(IServiceCollection services, IConfiguration configuration)
+    {
+        var retention = configuration.GetSection(AnalyticsRetentionOptions.SectionName)
+                            .Get<AnalyticsRetentionOptions>()
+                        ?? new AnalyticsRetentionOptions();
+        var archive = configuration.GetSection(AnalyticsArchiveOptions.SectionName)
+                          .Get<AnalyticsArchiveOptions>()
+                      ?? new AnalyticsArchiveOptions();
+
+        // 日界固定按 UTC：归档/清理的配置项也是 UTC，避免部署时区与 Quartz 默认本地时区错位。
+        var retentionHour = Math.Clamp(retention.RunAtHourUtc, 0, 23);
+        // 只允许 1~28 号，保证每个月都存在该日期（29~31 号在 2 月会缺一次执行）。
+        var archiveDay = Math.Clamp(archive.RunOnDayOfMonth, 1, 28);
+        var archiveHour = Math.Clamp(archive.RunAtHourUtc, 0, 23);
+
+        services.AddQuartz(quartz =>
+        {
+            quartz.ScheduleJob<ClickRetentionJob>(trigger => trigger
+                .WithIdentity("click-retention-daily")
+                .WithCronSchedule(
+                    $"0 0 {retentionHour} * * ?",
+                    schedule => schedule.InTimeZone(TimeZoneInfo.Utc)));
+
+            quartz.ScheduleJob<ClickArchiveJob>(trigger => trigger
+                .WithIdentity("click-archive-monthly")
+                .WithCronSchedule(
+                    $"0 0 {archiveHour} {archiveDay} * ?",
+                    schedule => schedule.InTimeZone(TimeZoneInfo.Utc)));
+        });
+        services.AddQuartzHostedService(options => options.WaitForJobsToComplete = true);
     }
 
     private static ConfigurationOptions BuildRedisOptions(string connectionString)

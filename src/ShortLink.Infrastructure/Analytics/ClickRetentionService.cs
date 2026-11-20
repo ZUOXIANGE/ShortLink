@@ -1,8 +1,6 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
-using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
-using Microsoft.Extensions.Options;
 using ShortLink.Application.Abstractions;
 using ShortLink.Application.Options;
 using ShortLink.Infrastructure.Diagnostics;
@@ -11,100 +9,18 @@ using ShortLink.Infrastructure.Persistence;
 namespace ShortLink.Infrastructure.Analytics;
 
 /// <summary>
-/// 点击明细保留策略。所有副本通过数据库租约互斥，最后成功日期也持久化：
-/// 只有完整成功才记录日期，失败按有界退避重试，进程重启不会把失败误当成功。
+/// 点击明细的生命周期：按月把超过热窗口的明细搬入归档表，按天清理剩余过期明细。
+/// 调度由 Quartz 负责，这里只暴露「执行一次」的可测方法；所有副本通过数据库租约互斥，
+/// 最后成功日期也持久化，进程重启不会把失败误当成功。
 /// </summary>
 public sealed class ClickRetentionService(
     IServiceScopeFactory scopeFactory,
-    IOptions<AnalyticsRetentionOptions> options,
     IClock clock,
-    ILogger<ClickRetentionService> logger) : BackgroundService
+    ILogger<ClickRetentionService> logger)
 {
-    private const string LeaseName = "click-retention";
-    private static readonly TimeSpan CheckInterval = TimeSpan.FromMinutes(15);
-    private static readonly TimeSpan StartupDelay = TimeSpan.FromMinutes(2);
+    private const string RetentionLeaseName = "click-retention";
+    private const string ArchiveLeaseName = "click-archive";
     private static readonly TimeSpan LeaseDuration = TimeSpan.FromMinutes(15);
-    private static readonly TimeSpan[] RetryDelays =
-        [TimeSpan.FromMinutes(1), TimeSpan.FromMinutes(5), TimeSpan.FromMinutes(15)];
-
-    protected override async Task ExecuteAsync(CancellationToken stoppingToken)
-    {
-        var settings = options.Value;
-        if (!settings.Enabled)
-        {
-            logger.LogInformation("点击明细保留策略未启用（Analytics:Retention:Enabled=false），不执行清理");
-            return;
-        }
-
-        if (settings.ClickRetentionDays <= 0)
-        {
-            logger.LogWarning(
-                "点击明细保留策略已启用但 ClickRetentionDays={Days} 非法，清理任务不会执行",
-                settings.ClickRetentionDays);
-            return;
-        }
-
-        if (logger.IsEnabled(LogLevel.Information))
-        {
-            logger.LogInformation(
-                "点击明细保留策略已启用：保留 {Days} 天，每天 {Hour}:00 UTC 执行",
-                settings.ClickRetentionDays,
-                settings.RunAtHourUtc);
-        }
-
-        try
-        {
-            await Task.Delay(StartupDelay, stoppingToken).ConfigureAwait(false);
-        }
-        catch (OperationCanceledException)
-        {
-            return;
-        }
-
-        var nextAttemptUtc = DateTime.MinValue;
-        var consecutiveFailures = 0;
-
-        while (!stoppingToken.IsCancellationRequested)
-        {
-            var now = clock.UtcNow;
-            var runAtHour = Math.Clamp(settings.RunAtHourUtc, 0, 23);
-            if (now >= nextAttemptUtc && now.Hour >= runAtHour)
-            {
-                try
-                {
-                    var result = await PurgeCoreAsync(now, settings, stoppingToken).ConfigureAwait(false);
-                    consecutiveFailures = 0;
-                    nextAttemptUtc = result.Status == RetentionRunStatus.Busy
-                        ? now.Add(RetryDelays[0])
-                        : now.Date.AddDays(1).AddHours(runAtHour);
-                }
-                catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested)
-                {
-                    break;
-                }
-                catch (Exception exception)
-                {
-                    var retryDelay = RetryDelays[Math.Min(consecutiveFailures, RetryDelays.Length - 1)];
-                    consecutiveFailures++;
-                    nextAttemptUtc = now.Add(retryDelay);
-                    logger.LogError(exception, "点击明细清理失败，将在 {Delay} 后重试（连续失败 {Failures} 次）",
-                        retryDelay, consecutiveFailures);
-                }
-            }
-
-            try
-            {
-                var delay = nextAttemptUtc > now && nextAttemptUtc - now < CheckInterval
-                    ? nextAttemptUtc - now
-                    : CheckInterval;
-                await Task.Delay(delay, stoppingToken).ConfigureAwait(false);
-            }
-            catch (OperationCanceledException)
-            {
-                break;
-            }
-        }
-    }
 
     /// <summary>执行一次清理并返回本次实际删除行数；其他副本持锁或当天已成功时返回 0。</summary>
     public async Task<int> PurgeAsync(
@@ -112,6 +28,21 @@ public sealed class ClickRetentionService(
         AnalyticsRetentionOptions settings,
         CancellationToken cancellationToken)
         => (await PurgeCoreAsync(nowUtc, settings, cancellationToken).ConfigureAwait(false)).DeletedRows;
+
+    /// <summary>执行一次归档并返回本次搬运行数；未启用时直接跳过。</summary>
+    public async Task<int> ArchiveAsync(
+        DateTime nowUtc,
+        AnalyticsArchiveOptions settings,
+        CancellationToken cancellationToken)
+    {
+        if (!settings.Enabled)
+        {
+            logger.LogDebug("点击明细归档未启用，跳过本次调度");
+            return 0;
+        }
+
+        return await ArchiveCoreAsync(nowUtc, settings, cancellationToken).ConfigureAwait(false);
+    }
 
     private async Task<RetentionPurgeResult> PurgeCoreAsync(
         DateTime nowUtc,
@@ -128,10 +59,13 @@ public sealed class ClickRetentionService(
         await using var scope = scopeFactory.CreateAsyncScope();
         var db = scope.ServiceProvider.GetRequiredService<ShortLinkDbContext>();
         // nowUtc 仅决定清理水位和完成日期；租约必须使用真实当前时钟，不能把历史回放时间当租约起点。
-        if (!await TryAcquireLeaseAsync(db, ownerId, clock.UtcNow, today, cancellationToken).ConfigureAwait(false))
+        if (!await TryAcquireLeaseAsync(db, RetentionLeaseName, ownerId, clock.UtcNow, today, cancellationToken)
+                .ConfigureAwait(false))
         {
             var alreadyCompleted = await db.ClickRetentionLeases.AnyAsync(
-                    lease => lease.Name == LeaseName && lease.LastCompletedDate != null && lease.LastCompletedDate >= today,
+                    lease => lease.Name == RetentionLeaseName
+                             && lease.LastCompletedDate != null
+                             && lease.LastCompletedDate >= today,
                     cancellationToken)
                 .ConfigureAwait(false);
             logger.LogDebug("点击明细清理跳过：当天已成功或其他副本持有有效租约");
@@ -147,16 +81,8 @@ public sealed class ClickRetentionService(
             while (total < maxRows && !cancellationToken.IsCancellationRequested)
             {
                 // 每批之前续约；失去租约就停止，避免过期持有者继续执行后续批次。
-                var batchNowUtc = clock.UtcNow;
-                var renewed = await db.ClickRetentionLeases
-                    .Where(lease => lease.Name == LeaseName
-                                    && lease.OwnerId == ownerId
-                                    && lease.LeaseUntilUtc > batchNowUtc)
-                    .ExecuteUpdateAsync(
-                        setters => setters.SetProperty(lease => lease.LeaseUntilUtc, batchNowUtc.Add(LeaseDuration)),
-                        cancellationToken)
-                    .ConfigureAwait(false);
-                if (renewed != 1)
+                if (!await RenewLeaseAsync(db, RetentionLeaseName, ownerId, clock.UtcNow, cancellationToken)
+                        .ConfigureAwait(false))
                 {
                     throw new InvalidOperationException("点击明细清理租约已丢失");
                 }
@@ -194,23 +120,12 @@ public sealed class ClickRetentionService(
                 }
             }
 
+            // 停机时不能把「执行到一半」记成当天成功，否则本日剩余数据不会再被处理。
+            cancellationToken.ThrowIfCancellationRequested();
+
             // 完成标记与所有者匹配原子更新，只有当前租约持有者能宣布当天成功。
-            var completedAtUtc = clock.UtcNow;
-            var marked = await db.ClickRetentionLeases
-                .Where(lease => lease.Name == LeaseName
-                                && lease.OwnerId == ownerId
-                                && lease.LeaseUntilUtc > completedAtUtc)
-                .ExecuteUpdateAsync(
-                    setters => setters
-                        .SetProperty(lease => lease.LastCompletedDate, today)
-                        .SetProperty(lease => lease.OwnerId, (string?)null)
-                        .SetProperty(lease => lease.LeaseUntilUtc, completedAtUtc),
-                    cancellationToken)
+            await MarkCompletedAsync(db, RetentionLeaseName, ownerId, today, clock.UtcNow, cancellationToken)
                 .ConfigureAwait(false);
-            if (marked != 1)
-            {
-                throw new InvalidOperationException("点击明细清理完成时租约已丢失，不能记录成功日期");
-            }
 
             completed = true;
             if (total > 0)
@@ -231,21 +146,126 @@ public sealed class ClickRetentionService(
         {
             if (!completed)
             {
-                try
+                await ReleaseLeaseAsync(db, RetentionLeaseName, ownerId, nowUtc).ConfigureAwait(false);
+            }
+        }
+    }
+
+    private async Task<int> ArchiveCoreAsync(
+        DateTime nowUtc,
+        AnalyticsArchiveOptions settings,
+        CancellationToken cancellationToken)
+    {
+        var days = Math.Max(settings.ArchiveAfterDays, 1);
+        var cutoff = nowUtc.Date.AddDays(-days);
+        var batchSize = Math.Clamp(settings.BatchSize, 50, 2000);
+        var maxRows = Math.Max(settings.MaxRowsPerRun, batchSize);
+        var today = DateOnly.FromDateTime(nowUtc);
+        var ownerId = Guid.NewGuid().ToString("N");
+
+        await using var scope = scopeFactory.CreateAsyncScope();
+        var db = scope.ServiceProvider.GetRequiredService<ShortLinkDbContext>();
+        if (!await TryAcquireLeaseAsync(db, ArchiveLeaseName, ownerId, clock.UtcNow, today, cancellationToken)
+                .ConfigureAwait(false))
+        {
+            logger.LogDebug("点击明细归档跳过：当天已成功或其他副本持有有效租约");
+            return 0;
+        }
+
+        var completed = false;
+        try
+        {
+            var total = 0;
+            while (total < maxRows && !cancellationToken.IsCancellationRequested)
+            {
+                if (!await RenewLeaseAsync(db, ArchiveLeaseName, ownerId, clock.UtcNow, cancellationToken)
+                        .ConfigureAwait(false))
                 {
-                    await db.ClickRetentionLeases
-                        .Where(lease => lease.Name == LeaseName && lease.OwnerId == ownerId)
-                        .ExecuteUpdateAsync(
-                            setters => setters
-                                .SetProperty(lease => lease.OwnerId, (string?)null)
-                                .SetProperty(lease => lease.LeaseUntilUtc, nowUtc),
-                            CancellationToken.None)
+                    throw new InvalidOperationException("点击明细归档租约已丢失");
+                }
+
+                var clicks = await db.ClickEvents
+                    .AsNoTracking()
+                    .Where(c => c.ClickedAtUtc < cutoff)
+                    .OrderBy(c => c.ClickedAtUtc)
+                    .ThenBy(c => c.Id)
+                    .Take(batchSize)
+                    .ToListAsync(cancellationToken)
+                    .ConfigureAwait(false);
+
+                if (clicks.Count == 0)
+                {
+                    break;
+                }
+
+                var ids = clicks.Select(c => c.Id).ToList();
+                var archivedAtUtc = clock.UtcNow;
+
+                int deleted;
+                // 归档插入与主表删除必须同批提交：否则「已归档未删除」会让下个月重复搬运。
+                await using (var transaction = await db.Database
+                                 .BeginTransactionAsync(cancellationToken)
+                                 .ConfigureAwait(false))
+                {
+                    db.ClickEventArchives.AddRange(clicks.Select(c => ClickEventArchive.From(c, archivedAtUtc)));
+                    await db.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
+                    deleted = await db.ClickEvents
+                        .Where(c => ids.Contains(c.Id))
+                        .ExecuteDeleteAsync(cancellationToken)
                         .ConfigureAwait(false);
+                    await transaction.CommitAsync(cancellationToken).ConfigureAwait(false);
                 }
-                catch (Exception exception)
+
+                // 归档实体不再需要跟踪，清掉以免单次运行搬得多时内存线性增长。
+                db.ChangeTracker.Clear();
+
+                total += deleted;
+                ShortLinkDiagnostics.ClicksArchived.Add(deleted);
+
+                if (clicks.Count < batchSize)
                 {
-                    logger.LogWarning(exception, "点击明细清理失败后释放租约失败，租约将在到期后自动释放");
+                    break;
                 }
+
+                if (settings.BatchDelayMilliseconds > 0)
+                {
+                    await Task.Delay(settings.BatchDelayMilliseconds, cancellationToken).ConfigureAwait(false);
+                }
+            }
+
+            // 停机时释放租约并让下次调度继续；不能把半次搬运记成当月成功。
+            cancellationToken.ThrowIfCancellationRequested();
+
+            await MarkCompletedAsync(db, ArchiveLeaseName, ownerId, today, clock.UtcNow, cancellationToken)
+                .ConfigureAwait(false);
+
+            completed = true;
+            if (total >= maxRows)
+            {
+                logger.LogWarning(
+                    "点击明细归档达到单次上限 {MaxRows} 行，剩余数据将在下一个归档周期继续搬运",
+                    maxRows);
+            }
+
+            if (total > 0)
+            {
+                if (logger.IsEnabled(LogLevel.Information))
+                {
+                    logger.LogInformation("点击明细归档完成：搬运 {Rows} 行（早于 {Cutoff:yyyy-MM-dd}）", total, cutoff);
+                }
+            }
+            else if (logger.IsEnabled(LogLevel.Debug))
+            {
+                logger.LogDebug("点击明细归档完成：没有需要归档的数据（早于 {Cutoff:yyyy-MM-dd}）", cutoff);
+            }
+
+            return total;
+        }
+        finally
+        {
+            if (!completed)
+            {
+                await ReleaseLeaseAsync(db, ArchiveLeaseName, ownerId, nowUtc).ConfigureAwait(false);
             }
         }
     }
@@ -259,15 +279,82 @@ public sealed class ClickRetentionService(
 
     private sealed record RetentionPurgeResult(int DeletedRows, RetentionRunStatus Status);
 
+    private static async Task<bool> RenewLeaseAsync(
+        ShortLinkDbContext db,
+        string leaseName,
+        string ownerId,
+        DateTime nowUtc,
+        CancellationToken cancellationToken)
+    {
+        var renewed = await db.ClickRetentionLeases
+            .Where(lease => lease.Name == leaseName
+                            && lease.OwnerId == ownerId
+                            && lease.LeaseUntilUtc > nowUtc)
+            .ExecuteUpdateAsync(
+                setters => setters.SetProperty(lease => lease.LeaseUntilUtc, nowUtc.Add(LeaseDuration)),
+                cancellationToken)
+            .ConfigureAwait(false);
+        return renewed == 1;
+    }
+
+    private static async Task MarkCompletedAsync(
+        ShortLinkDbContext db,
+        string leaseName,
+        string ownerId,
+        DateOnly today,
+        DateTime nowUtc,
+        CancellationToken cancellationToken)
+    {
+        var marked = await db.ClickRetentionLeases
+            .Where(lease => lease.Name == leaseName
+                            && lease.OwnerId == ownerId
+                            && lease.LeaseUntilUtc > nowUtc)
+            .ExecuteUpdateAsync(
+                setters => setters
+                    .SetProperty(lease => lease.LastCompletedDate, today)
+                    .SetProperty(lease => lease.OwnerId, (string?)null)
+                    .SetProperty(lease => lease.LeaseUntilUtc, nowUtc),
+                cancellationToken)
+            .ConfigureAwait(false);
+        if (marked != 1)
+        {
+            throw new InvalidOperationException($"{leaseName} 租约已丢失，不能记录成功日期");
+        }
+    }
+
+    private async Task ReleaseLeaseAsync(
+        ShortLinkDbContext db,
+        string leaseName,
+        string ownerId,
+        DateTime nowUtc)
+    {
+        try
+        {
+            await db.ClickRetentionLeases
+                .Where(lease => lease.Name == leaseName && lease.OwnerId == ownerId)
+                .ExecuteUpdateAsync(
+                    setters => setters
+                        .SetProperty(lease => lease.OwnerId, (string?)null)
+                        .SetProperty(lease => lease.LeaseUntilUtc, nowUtc),
+                    CancellationToken.None)
+                .ConfigureAwait(false);
+        }
+        catch (Exception exception)
+        {
+            logger.LogWarning(exception, "{Lease} 失败后释放租约失败，租约将在到期后自动释放", leaseName);
+        }
+    }
+
     private static async Task<bool> TryAcquireLeaseAsync(
         ShortLinkDbContext db,
+        string leaseName,
         string ownerId,
         DateTime nowUtc,
         DateOnly today,
         CancellationToken cancellationToken)
     {
         var acquired = await db.ClickRetentionLeases
-            .Where(lease => lease.Name == LeaseName
+            .Where(lease => lease.Name == leaseName
                             && (lease.LastCompletedDate == null || lease.LastCompletedDate < today)
                             && (lease.LeaseUntilUtc <= nowUtc || lease.OwnerId == ownerId))
             .ExecuteUpdateAsync(
@@ -281,13 +368,13 @@ public sealed class ClickRetentionService(
             return true;
         }
 
-        if (await db.ClickRetentionLeases.AnyAsync(lease => lease.Name == LeaseName, cancellationToken)
+        if (await db.ClickRetentionLeases.AnyAsync(lease => lease.Name == leaseName, cancellationToken)
                 .ConfigureAwait(false))
         {
             return false;
         }
 
-        var lease = ClickRetentionLease.Create(LeaseName, ownerId, nowUtc.Add(LeaseDuration));
+        var lease = ClickRetentionLease.Create(leaseName, ownerId, nowUtc.Add(LeaseDuration));
         db.ClickRetentionLeases.Add(lease);
         try
         {

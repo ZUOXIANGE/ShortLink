@@ -33,6 +33,7 @@
     <PackageReference Include="ZiggyCreatures.FusionCache" />
     <PackageReference Include="ZiggyCreatures.FusionCache.Backplane.StackExchangeRedis" />
     <PackageReference Include="MaxMind.GeoIP2" />
+    <PackageReference Include="Quartz" />
   </ItemGroup>
 
 </Project>

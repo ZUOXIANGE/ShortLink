@@ -117,6 +117,9 @@ try
     builder.Services.AddJwtAuthentication();
     builder.Services.AddShortLinkAuthorization();
 
+    // ── Quartz Dashboard：默认关闭，开启后复用账号体系登录 ─────
+    builder.Services.AddShortLinkQuartzDashboard(builder.Configuration);
+
     // ── CORS：管理后台为独立站点，必须白名单来源 ─────────────
     var allowedOrigins = builder.Configuration.GetSection("Cors:AllowedOrigins").Get<string[]>() ?? [];
     builder.Services.AddCors(options => options.AddDefaultPolicy(policy =>
@@ -330,10 +333,13 @@ try
     app.UseMiddleware<PartnerAuthenticationMiddleware>();
     app.UseRateLimiter();
     app.UseAuthorization();
+    // Dashboard 的 Blazor 表单需要防伪令牌；只对声明了防伪元数据的端点生效。
+    app.UseAntiforgery();
 
     app.MapOpenApi().WithDocumentPerVersion();
     app.MapScalarApiReference();
     app.MapHealthEndpoints();
+    app.MapShortLinkQuartzDashboard();
 
     var apiVersionSet = app
         .NewApiVersionSet()

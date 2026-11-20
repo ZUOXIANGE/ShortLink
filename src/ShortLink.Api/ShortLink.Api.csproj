@@ -5,6 +5,12 @@
     <AssemblyName>ShortLink.Api</AssemblyName>
     <UserSecretsId>shortlink-api-secrets</UserSecretsId>
     <Description>API 宿主：Minimal API 端点、统一信封与异常收口、JWT 认证、跳转端点、可观测性。</Description>
+    <!--
+      Quartz Dashboard 是 Blazor 静态 Web 资源 + 交互式服务端组件。
+      API 项目没有 .razor 文件，不打开这个开关时 /_framework/blazor.web.js 不会随包发布，
+      表现为页面能打开但所有按钮无响应。
+    -->
+    <RequiresAspNetWebAssets>true</RequiresAspNetWebAssets>
   </PropertyGroup>
 
   <ItemGroup>
@@ -26,6 +32,7 @@
     <PackageReference Include="Asp.Versioning.Http" />
     <PackageReference Include="Asp.Versioning.OpenApi" />
     <PackageReference Include="Scalar.AspNetCore" />
+    <PackageReference Include="Quartz.Dashboard" />
     <PackageReference Include="Serilog.AspNetCore" />
     <PackageReference Include="Serilog.Sinks.Console" />
     <PackageReference Include="Serilog.Sinks.File" />

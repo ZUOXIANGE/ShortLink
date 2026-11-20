@@ -229,6 +229,72 @@ public sealed class AnalyticsPersistenceTests
     }
 
     [Fact]
+    public async Task Archive_Should_Move_Expired_Clicks_To_Archive_Table()
+    {
+        await using var database = await ClickSqliteTestDatabase.CreateAsync();
+        long[] archivedIds;
+        await using (var db = database.CreateContext())
+        {
+            var expired = new[]
+            {
+                TestData.CreateClick(1, null, TestData.Now.AddDays(-100), false, "old-a"),
+                TestData.CreateClick(2, null, TestData.Now.AddDays(-40), false, "old-b"),
+            };
+            db.ClickEvents.AddRange(expired);
+            db.ClickEvents.Add(TestData.CreateClick(3, null, TestData.Now.AddDays(-5), false, "fresh"));
+            await db.SaveChangesAsync(TestContext.Current.CancellationToken);
+            archivedIds = expired.Select(click => click.Id).ToArray();
+        }
+
+        var service = CreateRetentionService(database, TestData.Now);
+        var settings = ArchiveSettings();
+
+        Assert.Equal(2, await service.ArchiveAsync(TestData.Now, settings, TestContext.Current.CancellationToken));
+        // 同一天重复调度直接跳过，不会重复搬运。
+        Assert.Equal(0, await service.ArchiveAsync(TestData.Now, settings, TestContext.Current.CancellationToken));
+
+        await using (var db = database.CreateContext())
+        {
+            Assert.Equal(1, await db.ClickEvents.CountAsync(TestContext.Current.CancellationToken));
+            var archives = await db.ClickEventArchives
+                .OrderBy(click => click.Id)
+                .ToListAsync(TestContext.Current.CancellationToken);
+            Assert.Equal(archivedIds, archives.Select(click => click.Id));
+            Assert.All(archives, click => Assert.Equal(TestData.Now, click.ArchivedAtUtc));
+            Assert.Equal(
+                new[] { DateOnly.FromDateTime(TestData.Now.AddDays(-100)), DateOnly.FromDateTime(TestData.Now.AddDays(-40)) },
+                archives.Select(click => click.ClickDate));
+
+            var lease = await db.ClickRetentionLeases.SingleAsync(TestContext.Current.CancellationToken);
+            Assert.Equal(DateOnly.FromDateTime(TestData.Now), lease.LastCompletedDate);
+            Assert.Null(lease.OwnerId);
+        }
+    }
+
+    [Fact]
+    public async Task Archive_Should_Do_Nothing_When_Disabled()
+    {
+        await using var database = await ClickSqliteTestDatabase.CreateAsync();
+        await using (var db = database.CreateContext())
+        {
+            db.ClickEvents.Add(TestData.CreateClick(1, null, TestData.Now.AddDays(-100), false, "old"));
+            await db.SaveChangesAsync(TestContext.Current.CancellationToken);
+        }
+
+        var service = CreateRetentionService(database, TestData.Now);
+        var settings = ArchiveSettings();
+        settings.Enabled = false;
+
+        Assert.Equal(0, await service.ArchiveAsync(TestData.Now, settings, TestContext.Current.CancellationToken));
+
+        await using (var db = database.CreateContext())
+        {
+            Assert.Equal(1, await db.ClickEvents.CountAsync(TestContext.Current.CancellationToken));
+            Assert.Empty(await db.ClickEventArchives.ToListAsync(TestContext.Current.CancellationToken));
+        }
+    }
+
+    [Fact]
     public async Task Retention_Should_Not_Record_Success_When_Purge_Fails()
     {
         await using var database = await ClickSqliteTestDatabase.CreateAsync();
@@ -257,7 +323,6 @@ public sealed class AnalyticsPersistenceTests
             .BuildServiceProvider();
         return new ClickRetentionService(
             services.GetRequiredService<IServiceScopeFactory>(),
-            Microsoft.Extensions.Options.Options.Create(RetentionSettings()),
             new TestClock(now),
             NullLogger<ClickRetentionService>.Instance);
     }
@@ -266,6 +331,15 @@ public sealed class AnalyticsPersistenceTests
     {
         Enabled = true,
         ClickRetentionDays = 30,
+        BatchSize = 100,
+        MaxRowsPerRun = 1000,
+        BatchDelayMilliseconds = 0,
+    };
+
+    private static AnalyticsArchiveOptions ArchiveSettings() => new()
+    {
+        Enabled = true,
+        ArchiveAfterDays = 30,
         BatchSize = 100,
         MaxRowsPerRun = 1000,
         BatchDelayMilliseconds = 0,
