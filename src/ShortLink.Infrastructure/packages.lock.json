@@ -4,12 +4,12 @@
     "net10.0": {
       "MaxMind.GeoIP2": {
         "type": "Direct",
-        "requested": "[6.1.0, )",
-        "resolved": "6.1.0",
-        "contentHash": "IBy7B0mhzZfLvCZd2znr8+nquNUL8K973MVorQEQowvlX/BHFCVHK6BoMhdIT6ZpDIc8ETMl4ZyixS/6iBQ26A==",
+        "requested": "[6.2.0, )",
+        "resolved": "6.2.0",
+        "contentHash": "61+joGJPz6+K3X1HCCzFxkTDuOKgEtUj9oaSDj2UzDDZAxJ2vWlKnlDn1IjPhSlY3htFWlQOgaRwypDVg5wU9g==",
         "dependencies": {
-          "MaxMind.Db": "5.1.0",
-          "Microsoft.Extensions.Options": "10.0.9"
+          "MaxMind.Db": "5.3.0",
+          "Microsoft.Extensions.Options": "10.0.14"
         }
       },
       "Microsoft.AspNetCore.Authentication.JwtBearer": {
@@ -350,8 +350,8 @@
       },
       "MaxMind.Db": {
         "type": "Transitive",
-        "resolved": "5.1.0",
-        "contentHash": "u4fynkxX0bNLYaz90N9m9FiaOX22WmEFKlHnvlqw8sswngH54oYvgynhT4GXZvqTy8l7D96/+E9OVzuu34ex9w=="
+        "resolved": "5.3.0",
+        "contentHash": "+T6h+SliYmKaRSg/PZnbQkQpLgIkEakok1qpWZZcA7Muy/I7apjPVuw9wvEhydEzLzASR/ieigSi4Q6UlMQeYQ=="
       },
       "Microsoft.Bcl.AsyncInterfaces": {
         "type": "Transitive",

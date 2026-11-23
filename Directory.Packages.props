@@ -38,7 +38,7 @@
     <PackageVersion Include="FluentValidation.DependencyInjectionExtensions" Version="12.2.0" />
     <PackageVersion Include="ZiggyCreatures.FusionCache" Version="2.10.0" />
     <PackageVersion Include="ZiggyCreatures.FusionCache.Backplane.StackExchangeRedis" Version="2.10.0" />
-    <PackageVersion Include="MaxMind.GeoIP2" Version="6.1.0" />
+    <PackageVersion Include="MaxMind.GeoIP2" Version="6.2.0" />
   </ItemGroup>
   <ItemGroup Label="调度">
     <!--
