@@ -119,9 +119,9 @@
       },
       "WolverineFx": {
         "type": "Direct",
-        "requested": "[6.64.0, )",
-        "resolved": "6.64.0",
-        "contentHash": "hoGE3ZTGontyepxYQ96OUklj81x3a5dg9k32rpgCa1yNHWdsfJCtr9Lx/wZidUv+lfzm+LSLoVHsXILYeq+e2A==",
+        "requested": "[6.64.2, )",
+        "resolved": "6.64.2",
+        "contentHash": "Ygj/Sx+o7Nt+iKsq6BiYW8AnPDUUPJRXGb8PYDZCnvAxCNSaoq11/jUMeBcisllelWjWQX2Wd/v8yVfiknLyEg==",
         "dependencies": {
           "Cronos": "0.11.0",
           "JasperFx": "2.102.0",
@@ -141,78 +141,78 @@
       },
       "WolverineFx.EntityFrameworkCore": {
         "type": "Direct",
-        "requested": "[6.64.0, )",
-        "resolved": "6.64.0",
-        "contentHash": "SYn1juewjXZLG8gzwrtD3k6/LjP3Lg4MCDbW8ww6A3y418xpfYujterg1HHKHcLRnRu4Z7f1CEOIttFEip8hBw==",
+        "requested": "[6.64.2, )",
+        "resolved": "6.64.2",
+        "contentHash": "TCFTp9HABtrGhyeNdCqz3F+jMMCDbUIYpUptqlSDAjOBk717WzA+BYw47+gJWazxAgh1P5K7SqrU0v0jHKZnoA==",
         "dependencies": {
           "Microsoft.EntityFrameworkCore": "10.0.4",
           "Microsoft.EntityFrameworkCore.Design": "10.0.4",
           "Microsoft.EntityFrameworkCore.Relational": "10.0.4",
           "Weasel.EntityFrameworkCore": "9.50.0",
-          "WolverineFx.RDBMS": "6.64.0"
+          "WolverineFx.RDBMS": "6.64.2"
         }
       },
       "WolverineFx.Kafka": {
         "type": "Direct",
-        "requested": "[6.64.0, )",
-        "resolved": "6.64.0",
-        "contentHash": "l86uITmY4VkRW4WYqtMENv+CGrfrWVigfZvRjMWWXnmItzxfdwXMpWVdxBy3yzLQK++OOa42JmBLLNZ1Ki2bCQ==",
+        "requested": "[6.64.2, )",
+        "resolved": "6.64.2",
+        "contentHash": "LmVS1iiL9/HW0NvMFB2zlQGiu82vCMQvhNO64zDyxcfXni4eF1gOuYXuujZrIyr/2I9eSDUMM8HHfCm4RnzphQ==",
         "dependencies": {
           "Confluent.SchemaRegistry.Serdes.Avro": "2.14.0",
           "Confluent.SchemaRegistry.Serdes.Json": "2.14.0",
-          "WolverineFx": "6.64.0"
+          "WolverineFx": "6.64.2"
         }
       },
       "WolverineFx.MySql": {
         "type": "Direct",
-        "requested": "[6.64.0, )",
-        "resolved": "6.64.0",
-        "contentHash": "DxlmNxMs+eNTknyc+WbSodiTZpogeOC6PtuitUVAWpkZVLNyo+TrHinO7dpvj09gr/R2oWYL2h2ErjTr914M/g==",
+        "requested": "[6.64.2, )",
+        "resolved": "6.64.2",
+        "contentHash": "HtiKRCO/m3YnnVTwYe0eruGaWwDpVs2a+Te8hngfq9v2rL0Mu+aYZVbZNoYpoVPwWA3XLJ+y0dCk7e1oHZvcGA==",
         "dependencies": {
           "MySqlConnector": "2.6.1",
           "Weasel.MySql": "9.50.0",
-          "WolverineFx.RDBMS": "6.64.0"
+          "WolverineFx.RDBMS": "6.64.2"
         }
       },
       "WolverineFx.Postgresql": {
         "type": "Direct",
-        "requested": "[6.64.0, )",
-        "resolved": "6.64.0",
-        "contentHash": "2oQduQBFxVGH11zOxlqlS/d8SjJUaZaN+sFcRnXK+SgFmozu9QjFDuRlw3i3hOK42cpnG9hfkDxs5Reot3Gr3A==",
+        "requested": "[6.64.2, )",
+        "resolved": "6.64.2",
+        "contentHash": "HHFCEutzHAiM8oTG+a+CRaXU08HtZwL0hTs+ilPYMZAdbLQf9M5CaF9JDH2PQx4MS/zBSnDOqXfepr2xMaS+Yg==",
         "dependencies": {
           "Weasel.Postgresql": "9.50.0",
-          "WolverineFx.RDBMS": "6.64.0"
+          "WolverineFx.RDBMS": "6.64.2"
         }
       },
       "WolverineFx.RabbitMQ": {
         "type": "Direct",
-        "requested": "[6.64.0, )",
-        "resolved": "6.64.0",
-        "contentHash": "WNTX/kMQRKUrpqCs9gkdTKlF2r0h5H3RGUg8FACAIMOvAyMDlAaJjTupXoYUx1oS+OffwVMjLyZwy6dWt0gEDA==",
+        "requested": "[6.64.2, )",
+        "resolved": "6.64.2",
+        "contentHash": "8GKtsxap6Why8/YZgCcFYNILLoj3pcg/uWcOESd+n5z+hIMM8DGR3zqV4dSm/lhc4lBAF24nogDQoeAcfqaW9A==",
         "dependencies": {
           "RabbitMQ.Client": "7.2.2",
-          "WolverineFx": "6.64.0",
-          "WolverineFx.Newtonsoft": "6.64.0"
+          "WolverineFx": "6.64.2",
+          "WolverineFx.Newtonsoft": "6.64.2"
         }
       },
       "WolverineFx.RuntimeCompilation": {
         "type": "Direct",
-        "requested": "[6.64.0, )",
-        "resolved": "6.64.0",
-        "contentHash": "dMNmIIntswBpukJ/80CJA5jGlqMXa+t09eWlFbKZSXvz0e3btgCUJexNNHdndaBl0lCABflMJ12wjhZLhMxvXg==",
+        "requested": "[6.64.2, )",
+        "resolved": "6.64.2",
+        "contentHash": "rmjLtFtarXQXCrn+j8u+Wcwq73iLoyP4l2Rk5k+HyldXCwdtLCoMX87LNPf5aWoY5TzdhboV4mNfYJhicqhp3Q==",
         "dependencies": {
           "JasperFx.RuntimeCompiler": "5.1.0",
-          "WolverineFx": "6.64.0"
+          "WolverineFx": "6.64.2"
         }
       },
       "WolverineFx.Sqlite": {
         "type": "Direct",
-        "requested": "[6.64.0, )",
-        "resolved": "6.64.0",
-        "contentHash": "NlmRLT5SOOvvHiknTLNPBo2dFkEypjRCylu75mLwMzTUCzZivdbCk1V/CrJAkoGQjCYvR4ZzP9uJmZTgbbw2Jg==",
+        "requested": "[6.64.2, )",
+        "resolved": "6.64.2",
+        "contentHash": "sSb1EkbgK7wEZ8hSbSd2+ZgGUrtV/upbynchTvYRBWPR+IrLEOwm6nnxGfHdWhTohEJ+QN9b8XqeFg20zdpABA==",
         "dependencies": {
           "Weasel.Sqlite": "9.50.0",
-          "WolverineFx.RDBMS": "6.64.0"
+          "WolverineFx.RDBMS": "6.64.2"
         }
       },
       "ZiggyCreatures.FusionCache": {
@@ -1208,20 +1208,20 @@
       },
       "WolverineFx.Newtonsoft": {
         "type": "Transitive",
-        "resolved": "6.64.0",
-        "contentHash": "p6Syrb0V8NZLlddTdYzvEpqJfNwMnKi8b3Z9LzQo4dSYkZx/I1uPs3LDr7uCT7ijbkLhAoJpjp2o/puSHOSKiA==",
+        "resolved": "6.64.2",
+        "contentHash": "WYeWuhZAj8Is4bAF/uv2axFiDL+xI+qpUTekK2vN1lIoIGzezG3+vNlfyW2xC3bj/vLq8LoBDz6clF9CKWcV5Q==",
         "dependencies": {
           "Newtonsoft.Json": "13.0.3",
-          "WolverineFx": "6.64.0"
+          "WolverineFx": "6.64.2"
         }
       },
       "WolverineFx.RDBMS": {
         "type": "Transitive",
-        "resolved": "6.64.0",
-        "contentHash": "Klrsjh1JhFOhqgqJIpwjTjwpJmdsDdtDy3elObXC5AskHNJtleQHWVpvhC1QorwoyLyKnUqwJpe4q1fEpgPZ1w==",
+        "resolved": "6.64.2",
+        "contentHash": "EPMlZmGXsy0E/E6ule58yCal+IREHAhwyKk01EH0R2FWYCBhVbnd1+II0WE6EH+me9Ay5pGh7vvQKi2jQbGpyg==",
         "dependencies": {
           "Weasel.Core": "9.50.0",
-          "WolverineFx": "6.64.0"
+          "WolverineFx": "6.64.2"
         }
       },
       "shortlink.application": {
